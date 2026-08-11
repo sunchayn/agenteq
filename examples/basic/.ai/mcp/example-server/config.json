@@ -1,0 +1,9 @@
+{
+    "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
+    "key": "example-server",
+    "type": "http",
+    "config": {
+        "url": "https://example.com/mcp",
+        "headers": { "Authorization": "Bearer example-token" }
+    }
+}

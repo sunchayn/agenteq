@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist/schema/
+.sandbox/
+coverage/
+*.log
+.DS_Store
+.idea/
+.ai/agenteq.json
+.claude/skills
+CLAUDE.md
+AGENTS.md
+.cursor/skills
+.agents/skills
+.mcp.json
+.cursor/mcp.json
+.agents/mcp_config.json

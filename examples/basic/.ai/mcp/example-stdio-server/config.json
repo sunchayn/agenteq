@@ -1,0 +1,10 @@
+{
+    "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
+    "key": "example-stdio-server",
+    "type": "stdio",
+    "config": {
+        "command": "npx",
+        "args": ["-y", "example-mcp-server"],
+        "env": { "EXAMPLE_TOKEN": "example-value" }
+    }
+}

@@ -1,0 +1,75 @@
+name: Bug report
+description: Report something in agenteq that does not work as expected.
+labels: [bug]
+body:
+    - type: input
+      id: version
+      attributes:
+          label: agenteq version
+          description: Run `npx agenteq --version`, or check the version in your lockfile.
+          placeholder: 0.4.2
+      validations:
+          required: true
+
+    - type: dropdown
+      id: os
+      attributes:
+          label: Operating system
+          options:
+              - macOS
+              - Linux
+              - Windows
+              - Other
+      validations:
+          required: true
+
+    - type: input
+      id: node-version
+      attributes:
+          label: Node.js version
+          description: Run `node --version`.
+          placeholder: v18.20.0
+      validations:
+          required: true
+
+    - type: textarea
+      id: what-happened
+      attributes:
+          label: What happened
+          description: Describe the bug. Include the exact command you ran.
+      validations:
+          required: true
+
+    - type: textarea
+      id: expected
+      attributes:
+          label: What you expected instead
+      validations:
+          required: true
+
+    - type: textarea
+      id: steps
+      attributes:
+          label: Steps to reproduce
+          description: List the exact steps, in order, starting from a clean project if possible.
+          placeholder: |
+              1. Add this .ai/GUIDELINES.md content
+              2. Run npx agenteq sync
+              3. Open the generated file
+      validations:
+          required: true
+
+    - type: textarea
+      id: output
+      attributes:
+          label: Relevant output or error message
+          description: Paste the terminal output, including the error code shown in parentheses if there is one.
+          render: shell
+
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Checks
+          options:
+              - label: I searched existing issues and did not find this one already reported.
+                required: true

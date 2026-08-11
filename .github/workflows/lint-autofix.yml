@@ -1,0 +1,54 @@
+name: Lint Autofix
+
+on:
+    pull_request:
+
+concurrency:
+    group: lint-autofix-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    # Same-repo PRs: fix issues and push the fix back to the PR branch.
+    autofix:
+        name: Autofix and commit
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.head_ref }}
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+            - run: npm ci
+            - run: npm run style:fix
+            - uses: stefanzweifel/git-auto-commit-action@v5
+              with:
+                  commit_message: "style: apply lint and format fixes"
+
+    # Fork PRs: forks don't get a token with write access to push back, so
+    # this job just fails when fixes are needed instead of committing them.
+    check-fork:
+        name: Check formatting (fork PRs)
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+            - run: npm ci
+            - run: npm run style:fix
+            - name: Fail if lint or format changes are needed
+              run: |
+                  git diff --exit-code || {
+                    echo "Lint or format issues were found. This PR is from a fork, so the fix cannot be committed automatically."
+                    echo "Run 'npm run style:fix' locally, then push the changes."
+                    exit 1
+                  }

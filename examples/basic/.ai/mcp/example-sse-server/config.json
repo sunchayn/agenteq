@@ -1,0 +1,9 @@
+{
+    "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
+    "key": "example-sse-server",
+    "type": "sse",
+    "config": {
+        "url": "https://example.com/sse",
+        "headers": { "Authorization": "Bearer example-token" }
+    }
+}

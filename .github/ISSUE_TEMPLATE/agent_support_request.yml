@@ -1,0 +1,32 @@
+name: Request agent support
+description: Ask agenteq to support a coding agent it does not know yet.
+labels: [enhancement]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Use this template when agenteq has no definition at all for your agent, so `agenteq detect` never finds it and `agenteq sync` never writes anything for it.
+
+    - type: input
+      id: agent-name
+      attributes:
+          label: Agent name
+          placeholder: Example Agent
+      validations:
+          required: true
+
+    - type: input
+      id: agent-website
+      attributes:
+          label: Agent website
+          placeholder: https://example.com
+      validations:
+          required: true
+
+    - type: textarea
+      id: installation
+      attributes:
+          label: Installation details
+          description: How does someone install this agent, and where does it read its own config, guidelines, MCP servers, skills, or commands from? Include exact file paths.
+      validations:
+          required: false

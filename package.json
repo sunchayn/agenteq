@@ -1,0 +1,84 @@
+{
+    "name": "agenteq",
+    "version": "1.0.0",
+    "description": "A single-source CLI tool to compile and publish repository rules, skills, commands, and MCP configurations to the developer's local AI agents.",
+    "keywords": [
+        "ai",
+        "ai-agents",
+        "coding-agent",
+        "agentic-coding",
+        "cli",
+        "mcp",
+        "model-context-protocol",
+        "agents-md",
+        "claude-code",
+        "cursor",
+        "codex",
+        "github-copilot",
+        "guidelines",
+        "skills",
+        "developer-tools"
+    ],
+    "license": "MIT",
+    "type": "module",
+    "homepage": "https://github.com/sunchayn/agenteq#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sunchayn/agenteq.git"
+    },
+    "bugs": {
+        "url": "https://github.com/sunchayn/agenteq/issues"
+    },
+    "bin": {
+        "agenteq": "dist/cli.js"
+    },
+    "files": [
+        "dist",
+        "dist/schema"
+    ],
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "build": "tsup --config tools/tsup/tsup.config.ts && tsx scripts/generate-schema.ts",
+        "dev": "tsup --config tools/tsup/tsup.config.ts --watch",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint --config tools/eslint/eslint.config.js .",
+        "prettier": "prettier --config tools/prettier/.prettierrc.json --ignore-path tools/prettier/.prettierignore",
+        "style:check": "npm run prettier -- --check .",
+        "style:fix": "npm run lint -- --fix && npm run prettier -- --write .",
+        "test": "vitest run --config tools/vitest/vitest.config.ts",
+        "test:coverage": "vitest run --config tools/vitest/vitest.config.ts --coverage",
+        "check": "npm run lint && npm run typecheck && npm test",
+        "sandbox": "tsx scripts/sandbox.ts",
+        "prepublishOnly": "npm run build",
+        "publish:npm": "NODE_ENV=production npm publish --access public",
+        "agenteq": "tsx src/cli.ts"
+    },
+    "dependencies": {
+        "@clack/prompts": "^1.7.0",
+        "commander": "^12.1.0",
+        "fast-glob": "^3.3.3",
+        "picocolors": "^1.1.1",
+        "smol-toml": "^1.7.1",
+        "yaml": "^2.9.0",
+        "zod": "^4.4.3"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.2",
+        "@vitest/coverage-v8": "^4.1.10",
+        "eslint": "^9.17.0",
+        "eslint-plugin-jsdoc": "^63.3.3",
+        "eslint-plugin-perfectionist": "^5.10.1",
+        "prettier": "^3.4.2",
+        "tsup": "^8.3.5",
+        "tsx": "^4.23.11",
+        "typescript": "^5.7.2",
+        "typescript-eslint": "^8.18.0",
+        "vitest": "^4.1.10",
+        "vite-tsconfig-paths": "^6.1.1"
+    },
+    "overrides": {
+        "vite": "^7.3.6"
+    }
+}

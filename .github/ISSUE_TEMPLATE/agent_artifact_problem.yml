@@ -1,0 +1,50 @@
+name: Problem with agent artifacts
+description: Report that agenteq supports your agent, but the generated file is missing, wrong, or in the wrong place.
+labels: [bug]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Use this template when agenteq already knows this agent, but what it generates, guidelines, MCP config, a skill, or a command, does not match what the agent actually reads.
+
+    - type: input
+      id: agent-name
+      attributes:
+          label: Agent name
+          placeholder: Example Agent
+      validations:
+          required: true
+
+    - type: input
+      id: agent-website
+      attributes:
+          label: Agent website
+          placeholder: https://example.com
+      validations:
+          required: true
+
+    - type: textarea
+      id: installation
+      attributes:
+          label: Installation details
+          description: Which version of the agent do you have installed, and how did you install it?
+      validations:
+          required: false
+
+    - type: textarea
+      id: expected-output
+      attributes:
+          label: Example of expected output
+          description: Show what the correct file should look like for this agent, with its exact path and content.
+          render: text
+      validations:
+          required: true
+
+    - type: textarea
+      id: current-behavior
+      attributes:
+          label: Current broken behavior
+          description: Paste what agenteq actually generated, or describe what is missing.
+          render: text
+      validations:
+          required: true

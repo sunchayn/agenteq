@@ -1,0 +1,15 @@
+# Normalize line endings for all text files.
+* text=auto eol=lf
+
+# Exclude development-only files from `git archive` exports (e.g. GitHub release
+# source archives / tarballs). This does not affect `npm publish`, which is governed
+# by package.json's "files" field instead.
+/.ai                export-ignore
+/.sandbox           export-ignore
+/.editorconfig      export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/tools              export-ignore
+/tests              export-ignore
+/scripts            export-ignore
+/package-lock.json  export-ignore

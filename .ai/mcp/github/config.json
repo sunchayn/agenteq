@@ -1,0 +1,8 @@
+{
+    "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
+    "key": "github",
+    "type": "http",
+    "config": {
+        "url": "https://api.githubcopilot.com/mcp/"
+    }
+}
