@@ -299,6 +299,44 @@ describe("artifactsManager.sync", () => {
         expect(outcome.gitignoreAlerts).toEqual([".mcp.json"]);
     });
 
+    it("still gitignores and flags an mcp config file whose entry already existed and needed no write", async () => {
+        spawnSync("git", ["init", "--quiet"], { cwd: cwd });
+        spawnSync("git", ["config", "user.email", "test@example.com"], {
+            cwd: cwd,
+        });
+
+        spawnSync("git", ["config", "user.name", "Test"], { cwd: cwd });
+
+        await writeFile(
+            join(cwd, ".mcp.json"),
+            JSON.stringify({ mcpServers: { example: { command: "npx" } } }),
+        );
+
+        spawnSync("git", ["add", ".mcp.json"], { cwd: cwd });
+
+        await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                key: "example",
+                type: "stdio",
+            }),
+        );
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.results[0].status).toBe(SyncStatus.Skipped);
+        expect(outcome.gitignoreAlerts).toEqual([".mcp.json"]);
+        expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(
+            ".mcp.json",
+        );
+    });
+
     it("flags a guidelines file that was already committed before it got gitignored", async () => {
         spawnSync("git", ["init", "--quiet"], { cwd: cwd });
         spawnSync("git", ["config", "user.email", "test@example.com"], {

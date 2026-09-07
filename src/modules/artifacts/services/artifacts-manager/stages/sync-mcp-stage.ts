@@ -68,12 +68,9 @@ async function installMcpServers(
     const artifactPaths: string[] = [];
 
     for (const [filePath, installs] of installsByFile) {
-        const wasWritten = await processFile(filePath, installs);
+        await processFile(filePath, installs);
 
-        if (!wasWritten) {
-            continue;
-        }
-
+        // Gitignore every resolved config path, even one left unwritten this run because its content already matched.
         const relPath = relative(cwd, filePath);
 
         await git.ignore({ cwd: cwd, relPath: relPath });
