@@ -19,10 +19,13 @@ One file under `src/modules/agents/definitions/`, exporting a single `new Agent(
 5. Opt into only the capabilities the agent actually supports: `guidelinesPath`, `commandsDir`, `skillsDir` (a plain string path each), `mcp` (a `McpConfiguration` built with `createMcpConfiguration`, taking a `configPath` and `entryMappers`).
 6. Register it in `src/modules/agents/registry.ts`: one import, one entry added to the exported `agentDefinitions` array.
 
-No other file should need to change. If adding an agent requires touching a sync stage, that's a sign a capability abstraction is leaking agent-specific logic. Reconsider the capability configuration instead of special-casing the new agent inside a stage.
+No other source file should need to change. If adding an agent requires touching a sync stage, that's a sign a capability abstraction is leaking agent-specific logic. Reconsider the capability configuration instead of special-casing the new agent inside a stage.
+
+One file outside the source tree still needs updating: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md)'s reference table hardcodes every agent's native guidelines path, skills/commands directory, command file extension, and MCP config path, key path, and entry shape. That skill runs in a different repo with no access to this codebase, so it cannot read `definitions/{name}.ts` directly. Adding a new agent, or changing any of those fields on an existing one, needs the matching row added or updated in that table.
 
 ## 3. Related Skills
 
 - **General TypeScript conventions**: [write-typescript-code](../write-typescript-code/SKILL.md)
 - **Adding a sync capability**: [add-capability-stage](../add-capability-stage/SKILL.md)
 - **Verifying the new definition's output**: [e2e-test-agents](../e2e-test-agents/SKILL.md)
+- **Keeping the reverse-engineering table current**: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md)
