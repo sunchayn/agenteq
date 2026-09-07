@@ -52,6 +52,8 @@ npx skills add https://github.com/sunchayn/agenteq/tree/base/.ai/skills/refactor
 
 Then invoke it via `/refactor-to-agenteq`.
 
+See [`examples/refactor-demo`](/examples/refactor-demo) for a repo with `.claude/` and `.cursor/` fully tracked and no `.ai/` yet, to try the skill against.
+
 ## Usage
 
 `agenteq` syncs four capabilities. These are guidelines, MCP servers, skills, and commands.
