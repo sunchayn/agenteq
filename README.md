@@ -42,7 +42,7 @@ See [`examples/basic`](/examples/basic) for a basic configuration example.
 
 ## Migrating an existing repo
 
-If your repo already has scattered per-agent config, a `CLAUDE.md`, a `.cursor/` folder, an `AGENTS.md`, etc. you don't need to copy that content into `.ai/` by hand.  Agenteq ships a skill for that. It will reconcile the scattered files into one source of truth and untrack everything that is not needed anymore.
+If your repo already has scattered per-agent config, a `CLAUDE.md`, a `.cursor/` folder, an `AGENTS.md`, etc. you don't need to copy that content into `.ai/` by hand. Agenteq ships a skill for that. It will reconcile the scattered files into one source of truth and untrack everything that is not needed anymore.
 
 Install it as a coding agent skill:
 
