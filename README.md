@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Coverage](https://img.shields.io/codecov/c/github/sunchayn/agenteq?style=flat-square)](https://codecov.io/gh/sunchayn/agenteq)
 
-[Getting started](#getting-started) • [Usage](#usage) • [Supported agents](#supported-agents)
+[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Usage](#usage) • [Supported agents](#supported-agents)
 
 **A single source of truth for AI coding agents configuration.**<br />
 Agenteq reads guidelines, MCP servers, skills, and commands from one centralized folder, detects installed agents, and generate each relevant artifact in the path/format the agent expects.
@@ -39,6 +39,18 @@ npx agenteq init
 This looks at your machine and project, finds which agents are installed, lets you confirm or change the list, and generates the first set of artifacts for each agent.
 
 See [`examples/basic`](/examples/basic) for a basic configuration example.
+
+## Migrating an existing repo
+
+If your repo already has scattered per-agent config, a `CLAUDE.md`, a `.cursor/` folder, an `AGENTS.md`, etc. you don't need to copy that content into `.ai/` by hand.  Agenteq ships a skill for that. It will reconcile the scattered files into one source of truth and untrack everything that is not needed anymore.
+
+Install it as a coding agent skill:
+
+```bash
+npx skills add https://github.com/sunchayn/agenteq/tree/base/.ai/skills/refactor-to-agenteq
+```
+
+Then invoke it via `/refactor-to-agenteq`.
 
 ## Usage
 
