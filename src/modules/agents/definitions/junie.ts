@@ -1,8 +1,8 @@
 import { stdioMapper } from "@agents/mcpMappers/stdio-mapper.js";
-import { untypedRemoteMapper } from "@agents/mcpMappers/remote-mapper.js";
 import Agent from "@agents/entities/agent.js";
 import { createDetectionConfiguration } from "@agents/types/detection-configuration.js";
 import { createMcpConfiguration } from "@agents/types/mcp-configuration.js";
+import type { McpRemoteServer } from "@agents/entities/mcp-server.js";
 
 /**
  * @see https://junie.jetbrains.com
@@ -16,7 +16,7 @@ const junie = new Agent({
     mcp: createMcpConfiguration({
         configPath: ".junie/mcp/mcp.json",
         entryMappers: {
-            remote: untypedRemoteMapper,
+            remote: toMcpRemoteShim,
             stdio: stdioMapper,
         },
     }),
@@ -66,5 +66,21 @@ const junie = new Agent({
                         ],
         }),
 });
+
+/*
+ * Internal.
+ */
+
+/**
+ * Junie has no native http or sse support.
+ * A remote entry is wrapped as an npx invocation of the mcp-remote shim instead.
+ * Headers and any other config field have no equivalent in that shim, so they are dropped.
+ */
+function toMcpRemoteShim(server: McpRemoteServer): Record<string, unknown> {
+    return {
+        args: ["-y", "mcp-remote", server.url],
+        command: "npx",
+    };
+}
 
 export default junie;
