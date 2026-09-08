@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.1.0](https://github.com/sunchayn/agenteq/compare/agenteq-v1.0.0...agenteq-v1.1.0) (2026-09-08)
+## [1.1.0](https://github.com/sunchayn/agenteq/compare/v1.0.0...v1.1.0) (2026-09-08)
 
 ### Added
 
