@@ -7,17 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.2.0](https://github.com/sunchayn/agenteq/compare/agenteq-v1.1.0...agenteq-v1.2.0) (2026-09-08)
 
-
 ### Added
 
-* **ai:** add `/refactor-to-agenteq` skill ([#1](https://github.com/sunchayn/agenteq/issues/1)) ([67fd45f](https://github.com/sunchayn/agenteq/commit/67fd45fbb54866fb258c1dadc0a597e12f200784))
-
+- **ai:** add `/refactor-to-agenteq` skill ([#1](https://github.com/sunchayn/agenteq/issues/1)) ([67fd45f](https://github.com/sunchayn/agenteq/commit/67fd45fbb54866fb258c1dadc0a597e12f200784))
 
 ### Fixed
 
-* **agents:** properly map Junie remote MCP ([#3](https://github.com/sunchayn/agenteq/issues/3)) ([20903ba](https://github.com/sunchayn/agenteq/commit/20903bac7e5ebe6b8fbf1eab159cacdb7b107640))
-* **artifacts:** properly git ignore mcp configs ([#2](https://github.com/sunchayn/agenteq/issues/2)) ([a185623](https://github.com/sunchayn/agenteq/commit/a185623914289cd702c3581b297f669e9c770e4c))
-* **release:** drop package-name prefix from release tags ([#8](https://github.com/sunchayn/agenteq/issues/8)) ([2d88b01](https://github.com/sunchayn/agenteq/commit/2d88b01c8dbe588e2e21a620274f8999fea13342))
+- **agents:** properly map Junie remote MCP ([#3](https://github.com/sunchayn/agenteq/issues/3)) ([20903ba](https://github.com/sunchayn/agenteq/commit/20903bac7e5ebe6b8fbf1eab159cacdb7b107640))
+- **artifacts:** properly git ignore mcp configs ([#2](https://github.com/sunchayn/agenteq/issues/2)) ([a185623](https://github.com/sunchayn/agenteq/commit/a185623914289cd702c3581b297f669e9c770e4c))
+- **release:** drop package-name prefix from release tags ([#8](https://github.com/sunchayn/agenteq/issues/8)) ([2d88b01](https://github.com/sunchayn/agenteq/commit/2d88b01c8dbe588e2e21a620274f8999fea13342))
 
 ## [1.1.0](https://github.com/sunchayn/agenteq/compare/v1.0.0...v1.1.0) (2026-09-08)
 
