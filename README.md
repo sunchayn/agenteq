@@ -47,7 +47,7 @@ If your repo already has scattered per-agent config, a `CLAUDE.md`, a `.cursor/`
 Install it as a coding agent skill:
 
 ```bash
-npx skills add https://github.com/sunchayn/agenteq/tree/base/.ai/skills/refactor-to-agenteq
+npx skills add https://github.com/sunchayn/agenteq --skill refactor-to-agenteq
 ```
 
 Then invoke it via `/refactor-to-agenteq`.
