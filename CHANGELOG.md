@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0](https://github.com/sunchayn/agenteq/compare/agenteq-v1.0.0...agenteq-v1.1.0) (2026-09-08)
+
+### Added
+
+- **ai:** add `/refactor-to-agenteq` skill ([#1](https://github.com/sunchayn/agenteq/issues/1)) ([67fd45f](https://github.com/sunchayn/agenteq/commit/67fd45fbb54866fb258c1dadc0a597e12f200784))
+
+### Fixed
+
+- **agents:** properly map Junie remote MCP ([#3](https://github.com/sunchayn/agenteq/issues/3)) ([20903ba](https://github.com/sunchayn/agenteq/commit/20903bac7e5ebe6b8fbf1eab159cacdb7b107640))
+- **artifacts:** properly git ignore mcp configs ([#2](https://github.com/sunchayn/agenteq/issues/2)) ([a185623](https://github.com/sunchayn/agenteq/commit/a185623914289cd702c3581b297f669e9c770e4c))
+
 ## [1.0.0] - 2026-09-06
 
 Initial release. `agenteq` is a single source of truth for AI coding agent configuration. It reads guidelines, MCP servers, skills, and commands from one folder, detects which agents are installed, and writes each one in the format that agent expects.
