@@ -49,17 +49,20 @@ If the table lists a commands directory for the primary agent, and it exists, co
 
 ### 4.4 MCP servers
 
-If the table lists an MCP config file for the primary agent, and it exists, parse it (JSON, TOML, or JSONC, per the table). Read the entries at the table's MCP key path. Write each entry as its own `<source dir>/mcp/<key>/config.json` file, in this shape:
+If the table lists an MCP config file for the primary agent, and it exists:
 
-```json
-{
-    "key": "<entry key>",
-    "type": "stdio | http | sse",
-    "config": { }
-}
-```
+1. Parse it (JSON, TOML, or JSONC, per the table). Read the entries at the table's MCP key path.
+2. Write each entry as `<source dir>/mcp/<key>/config.json`, pretty-printed, 4-space indentation, one field per line, never a single compact line:
 
-Pretty-print this file: 4-space indentation, one field per line, exactly as shown above. Never write it as a single compact line.
+    ```json
+    {
+        "key": "<entry key>",
+        "type": "stdio | http | sse",
+        "config": { }
+    }
+    ```
+
+`config` fields by type:
 
 | `type` | `config` fields |
 |---|---|
@@ -67,13 +70,11 @@ Pretty-print this file: 4-space indentation, one field per line, exactly as show
 | `http` | `url` (required), `headers` |
 | `sse` | `url` (required), `headers` |
 
-Map each native field to its canonical name, using the table's Native stdio/remote fields columns: the field holding the command becomes `command`, the field holding the URL becomes `url`, and so on for `args`, `env`, `cwd`, and `headers`. Three notations in the table need extra handling:
+Map native fields to their canonical name using the table's Native stdio/remote fields columns, the field holding the command becomes `command`, the field holding the URL becomes `url`, and so on for `args`, `env`, `cwd`, and `headers`. Keep any field the table doesn't name, carried into `config` unchanged. Three notations need extra handling:
 
-- `command:[cmd,...args]`: the agent bundles the command and its arguments into one array. Split the first element into `command`, put the rest into `args`.
-- `(no type)`: the agent's remote entries carry no `type` field. Infer `http`, unless the URL or a sibling field says otherwise. Ask the user when it stays ambiguous.
-- `(no native remote, see mcp-remote note)`: the agent has no native remote support. A remote server appears disguised as a stdio entry running `npx -y mcp-remote <url>`. Reverse that exact shape into a canonical `http` entry with that URL, not into a `stdio` entry. Its headers are already gone, agenteq drops them on the way out.
-
-Keep any native field the table doesn't name. Carry it into `config` unchanged.
+- `command:[cmd,...args]`: split the first array element into `command`, the rest into `args`.
+- `(no type)`: infer `http`, unless the URL or a sibling field says otherwise. Ask the user when it stays ambiguous.
+- `(no native remote, see mcp-remote note)`: a stdio entry running `npx -y mcp-remote <url>` is a disguised remote server. Reverse it into a canonical `http` entry with that URL. Its headers are already gone, agenteq drops them on the way out.
 
 ## 5. Reconcile every other agent's artifacts already in the repo
 
@@ -106,7 +107,7 @@ This one command picks the capabilities, writes every agent's guidelines/skills/
 git rm -r --cached <paths>
 ```
 
-This step is mandatory whenever that warning appears. Show the command to the user, confirm before running it, untracking is reversible, but it changes what's staged for the next commit, then actually run it in the same turn once confirmed. Never end the skill, or a verification pass that re-ran `agenteq init`, with an unresolved warning still on screen. Afterward, stage the `.gitignore` update and the removal together, and confirm with `git status` that none of the warned paths remain tracked. Tell the user a commit is still needed, do not commit on their behalf unless asked.
+Run this command whenever that warning appears. This step is mandatory. Show the command to the user, and confirm before running it, untracking is reversible, but it changes what is staged for the next commit. Run it in the same turn once confirmed. Never end the skill, or a verification pass that re-ran `agenteq init`, with an unresolved warning still on screen. Afterward, stage the `.gitignore` update and the removal together, and confirm with `git status` that none of the warned paths remain tracked. Tell the user a commit is still needed. Do not commit on their behalf unless asked.
 
 No warning means nothing to untrack.
 
@@ -121,12 +122,11 @@ Reuse whatever hook system the repo already has. Never add a second one.
 - simple-git-hooks (a `"simple-git-hooks"` field in `package.json`): add `"post-checkout": "npx agenteq sync --yes"`. Tell the user to run `npx simple-git-hooks` once, to install it.
 - pre-commit framework (`.pre-commit-config.yaml`): add a local hook with `stages: [post-checkout]`, running `npx agenteq sync --yes`.
 - Overcommit (`.overcommit.yml`): add a `PostCheckout` hook running the same command.
+- A plain native hook (`.git/hooks/post-checkout`): append the sync call to it. Do not overwrite what it already does.
 
-If none of those exist, check `.git/hooks/post-checkout` for a plain native hook. If one exists, append the sync call to it. Do not overwrite what it already does.
+None of those exist: ask the user which hook manager to install, or whether to skip hook setup entirely. Do not pick one on the user's behalf.
 
-If nothing exists at all, install a proper hook manager for the repo's own ecosystem, rather than a one-off script. Husky is the default choice for a Node project, it ships a shared, committed `.husky/` convention that survives a fresh `npm install`. Fall back to writing `.git/hooks/post-checkout` directly, and marking it executable, only when no manager fits. A native hook under `.git/hooks/` is per-clone and not shared through git.
-
-Confirm with the user before adding or changing a hook. It fires on every branch switch, that should never happen silently.
+Confirm with the user before adding or changing a hook.
 
 ## 9. Clean up superseded artifacts
 
