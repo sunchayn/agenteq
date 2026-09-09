@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import input from "@infrastructure/terminal/input.js";
 import detectAgentsAction from "@agents/actions/detect-agents-action.js";
+import resolveBoostAgentsAction from "@agents/actions/resolve-boost-agents-action.js";
 import resolveSavedAgentsAction from "@agents/actions/resolve-saved-agents-action.js";
 import saveAgentsFileAction from "@agents/actions/save-agents-file-action.js";
 import resolveAgentsByNameAction from "@agents/actions/resolve-agents-by-name-action.js";
@@ -127,9 +128,16 @@ async function resolveAgentsToTarget(
         return savedAgents;
     }
 
+    const boostAgents = await resolveBoostAgentsAction({ context: context });
+
+    if (boostAgents) {
+        announceBoostAgents(boostAgents, options.isJson);
+    }
+
     const detectedAgents = await detectAgentsAction({ cwd: context.cwd });
 
-    const installedAgents = findInstalledAgentFrom(detectedAgents);
+    const installedAgents =
+        boostAgents ?? findInstalledAgentFrom(detectedAgents);
 
     // An interactive terminal can ask the user directly, so it overpowers any inferred default.
     // Saved and auto-detected agents are used as pre-selections in the prompt.
@@ -148,6 +156,19 @@ async function resolveAgentsToTarget(
     warnNoInstalledAgentsDetected(options.isJson);
 
     return [];
+}
+
+/**
+ * Prints which agents were preselected from an existing boost.json.
+ */
+function announceBoostAgents(agents: Agent[], isJson: boolean): void {
+    printMessage({
+        isJson: isJson,
+        level: "info",
+        message: `Found boost.json, using its agents: ${agents
+            .map((agent) => agent.displayName)
+            .join(", ")}`,
+    });
 }
 
 async function promptUserForAgents(

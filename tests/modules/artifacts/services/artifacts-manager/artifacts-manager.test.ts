@@ -359,6 +359,72 @@ describe("artifactsManager.sync", () => {
 
         expect(outcome.gitignoreAlerts).toEqual(["TEST.md"]);
     });
+
+    it("folds an existing Laravel Boost installation's guidelines into every synced agent", async () => {
+        await writeFile(
+            join(cwd, "boost.json"),
+            JSON.stringify({ agents: ["claude_code"] }),
+        );
+
+        await writeFile(
+            join(cwd, "CLAUDE.md"),
+            "Some hand-written note.\n\n<laravel-boost-guidelines>\nUse Pest for tests.\n</laravel-boost-guidelines>\n",
+        );
+
+        await mkdir(join(cwd, ".ai"), { recursive: true });
+        await writeFile(join(cwd, ".ai/GUIDELINES.md"), "# Hello\n");
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Guidelines],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.hasFailed).toBe(false);
+
+        const guidelines = await readFile(join(cwd, "TEST.md"), "utf8");
+
+        expect(guidelines).toContain("# Hello");
+        expect(guidelines).toContain(
+            "<laravel-boost-guidelines>\nUse Pest for tests.\n\n</laravel-boost-guidelines>",
+        );
+
+        const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
+
+        expect(gitignore).toContain("CLAUDE.md");
+    });
+
+    it("gitignores, but never reads or mirrors, skills Laravel Boost already generated", async () => {
+        await writeFile(
+            join(cwd, "boost.json"),
+            JSON.stringify({ agents: ["claude_code"] }),
+        );
+
+        await mkdir(join(cwd, ".claude/skills/boost-skill"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(cwd, ".claude/skills/boost-skill/SKILL.md"),
+            "boost skill content",
+        );
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Skills],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.hasFailed).toBe(false);
+
+        expect(
+            await filesystem.exists(join(cwd, ".test/skills/boost-skill")),
+        ).toBe(false);
+
+        const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
+
+        expect(gitignore).toContain(".claude/skills");
+    });
 });
 
 describe("syncGuidelinesAction", () => {

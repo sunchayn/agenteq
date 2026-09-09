@@ -190,6 +190,46 @@ A "No" here reflects that agent's own conventions, not a limitation of `agenteq`
 
 Detection methods vary by agent. Some rely on a CLI command, others on a project marker files or an install-folder pattern instead. Run `agenteq detect` on your machine to see what is actually installed.
 
+## Using agenteq with Laravel Boost
+
+At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and `agenteq` are doing the same thing. However, they are slightly different and can be combined.
+
+- **Laravel Boost** inspects the packages you actually have installed and generates guidelines and skills content from that. It writes this content into each real agent it is configured for, for example `CLAUDE.md` and `.claude/skills` for Claude Code, and it exposes its own MCP server, `boost:mcp`.
+- **Agenteq** takes your own canonical guidelines, commands, skills, and MCP servers, and distributes them into every agent you support.
+
+Therefore, Laravel Boost will generate the proper guidelines for your project and the skills for every configured agent. Then Agenteq run on top of that to distribute the Commands (Boost doesn't sync this) and the [project MCPs](#mcp-config) to all agents.
+
+To make them work together, first install Boost
+
+```bash
+php artisan boost:install --guidelines --skills && npx agenteq init --yes
+```
+
+then run the sync using this combination
+
+```bash
+php artisan boost:update && npx agenteq sync
+```
+
+### How does it work behind the scenes
+
+Agenteq reads `boost.json`, the file Boost writes naming which agent(s) it targeted, then pipes what Boost generated into its own sync, capability by capability:
+
+- **Guidelines.** Boost's `<laravel-boost-guidelines>` block is appended to `.ai/GUIDELINES.md`'s content, in every agent's own guidelines file. Then git ignore all guidelines.
+- **Skills.** Left entirely to Boost. When `boost.json` lists at least one skill, agenteq drops `skills` from its own default capability list, so it never syncs that capability for this project. It still git ignores the relevant skill directories.
+- **Commands.** Agenteq takes full control over this.
+- **MCP servers.** Agenteq takes full control over this. To enable Laravel Boost MCP, define it yourself under `.ai/mcp/laravel-boost/config.json`, the same way as any other MCP server (see [MCP config](#mcp-config)):
+
+    ```json
+    {
+        "key": "laravel-boost",
+        "type": "stdio",
+        "config": { "command": "php", "args": ["artisan", "boost:mcp"] }
+    }
+    ```
+
+See [`examples/laravel-boost`](/examples/laravel-boost) for a Laravel Boost example.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up the project locally, the available npm scripts, and the coding conventions this repo follows.

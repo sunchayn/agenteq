@@ -1,0 +1,6 @@
+{
+    "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
+    "key": "laravel-boost",
+    "type": "stdio",
+    "config": { "command": "php", "args": ["artisan", "boost:mcp"] }
+}

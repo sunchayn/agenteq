@@ -13,6 +13,7 @@ export class SyncPayload {
     readonly capabilities: AgentCapability[];
     readonly results: SyncResult[];
     readonly artifactPaths: string[];
+    readonly boostGuidelines?: string;
 
     constructor(options: SyncPayloadOptions) {
         this.context = options.context;
@@ -20,6 +21,7 @@ export class SyncPayload {
         this.capabilities = options.capabilities;
         this.results = options.results ?? [];
         this.artifactPaths = options.artifactPaths ?? [];
+        this.boostGuidelines = options.boostGuidelines;
     }
 
     wantsCapability(capability: AgentCapability): boolean {
@@ -35,9 +37,24 @@ export class SyncPayload {
     ): SyncPayload {
         return new SyncPayload({
             artifactPaths: [...this.artifactPaths, ...artifactPaths],
+            boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
             context: this.context,
             results: [...this.results, ...results],
+            selectedAgents: this.selectedAgents,
+        });
+    }
+
+    /**
+     * Returns a new payload carrying the guidelines resolved from an existing Laravel Boost installation.
+     */
+    withBoostGuidelines(boostGuidelines: string | undefined): SyncPayload {
+        return new SyncPayload({
+            artifactPaths: this.artifactPaths,
+            boostGuidelines: boostGuidelines,
+            capabilities: this.capabilities,
+            context: this.context,
+            results: this.results,
             selectedAgents: this.selectedAgents,
         });
     }
@@ -53,4 +70,5 @@ interface SyncPayloadOptions {
     capabilities: AgentCapability[];
     results?: SyncResult[];
     artifactPaths?: string[];
+    boostGuidelines?: string;
 }
