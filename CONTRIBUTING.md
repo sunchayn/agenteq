@@ -30,7 +30,7 @@ Without `--agents`, it targets whatever agents are actually detected on your mac
 
 ## Code style and conventions
 
-This repo keeps its own coding guidelines under `.ai/skills/`. Read the ones relevant to your change before opening a pull request.
+This repo keeps its own coding guidelines under `.ai/skills/`.
 
 - `.ai/skills/write-typescript-code`, layering rules, vocabulary, export shape, and general style for this codebase.
 - `.ai/skills/write-tests`, what to cover and how to structure a test in the Vitest suite.
@@ -38,4 +38,4 @@ This repo keeps its own coding guidelines under `.ai/skills/`. Read the ones rel
 - `.ai/skills/add-agent-definition`, steps for adding support for a new coding agent.
 - `.ai/skills/add-capability-stage`, steps for adding a new sync capability beyond mcp, commands, skills, and guidelines.
 
-`CLAUDE.md` in the repo root is generated from `.ai/GUIDELINES.md` by `agenteq sync`. If you need to change the guidelines themselves, edit the source under `.ai/` and re-run `agenteq sync`, don't edit the generated file directly.
+To generate the AI artifacts locally run `npm run agenteq -- sync`.
