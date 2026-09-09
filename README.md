@@ -211,6 +211,14 @@ then run the sync using this combination
 php artisan boost:update && npx agenteq sync
 ```
 
+If your project already runs Laravel Boost, you don't need to do anything by hand. Instead you can use the following skill:
+
+```bash
+npx skills add https://github.com/sunchayn/agenteq --skill add-agenteq-to-boost-project
+```
+
+Then invoke it via `/add-agenteq-to-boost-project`. It will take care of transforming your project to wire Agenteq on top of Laravel Boost and doing any necessary reconciliation.
+
 ### How does it work behind the scenes
 
 Agenteq reads `boost.json`, the file Boost writes naming which agent(s) it targeted, then pipes what Boost generated into its own sync, capability by capability:
