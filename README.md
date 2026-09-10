@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Coverage](https://img.shields.io/codecov/c/github/sunchayn/agenteq?style=flat-square)](https://codecov.io/gh/sunchayn/agenteq)
 
-[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Usage](#usage) • [Supported agents](#supported-agents)
+[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Usage](#usage) • [Supported agents](#supported-agents) • [Using agenteq with Laravel Boost](#using-agenteq-with-laravel-boost) • [Contributing](#contributing)
 
 **A single source of truth for AI coding agents configuration.**<br />
 Agenteq reads guidelines, MCP servers, skills, and commands from one centralized folder, detects installed agents, and generate each relevant artifact in the path/format the agent expects.
