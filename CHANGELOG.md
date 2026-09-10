@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0](https://github.com/sunchayn/agenteq/compare/v1.1.0...v1.2.0) (2026-09-10)
+
+
+### Added
+
+* **artifacts:** support `laravel boost`  ([#14](https://github.com/sunchayn/agenteq/issues/14)) ([e7e42a7](https://github.com/sunchayn/agenteq/commit/e7e42a7210552bb02bfb36dce220924013a0c639))
+
 ## [1.1.0](https://github.com/sunchayn/agenteq/compare/1.0.0...v1.1.0) (2026-09-08)
 
 ### Added
