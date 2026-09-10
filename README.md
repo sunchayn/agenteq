@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Coverage](https://img.shields.io/codecov/c/github/sunchayn/agenteq?style=flat-square)](https://codecov.io/gh/sunchayn/agenteq)
 
-[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Usage](#usage) • [Supported agents](#supported-agents) • [Using agenteq with Laravel Boost](#using-agenteq-with-laravel-boost) • [Contributing](#contributing)
+[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Usage](#usage) • [Supported agents](#supported-agents) • [Using it with Laravel Boost](#using-it-with-laravel-boost)
 
 **A single source of truth for AI coding agents configuration.**<br />
 Agenteq reads guidelines, MCP servers, skills, and commands from one centralized folder, detects installed agents, and generate each relevant artifact in the path/format the agent expects.
@@ -190,7 +190,7 @@ A "No" here reflects that agent's own conventions, not a limitation of `agenteq`
 
 Detection methods vary by agent. Some rely on a CLI command, others on a project marker files or an install-folder pattern instead. Run `agenteq detect` on your machine to see what is actually installed.
 
-## Using agenteq with Laravel Boost
+## Using it with Laravel Boost
 
 At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and `agenteq` are doing the same thing. However, they are slightly different and can be combined.
 
