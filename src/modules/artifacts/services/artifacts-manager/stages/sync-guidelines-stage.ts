@@ -30,6 +30,7 @@ interface WriteGuidelinesOptions {
     sourcePath: string;
     guidelinesPath: string;
     targetCwd: string;
+    boostGuidelines?: string;
 }
 
 interface SyncAgentsResult {
@@ -53,7 +54,10 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         "GUIDELINES.md",
     );
 
-    if (!(await filesystem.exists(source))) {
+    const hasSource = await filesystem.exists(source);
+
+    // A Boost-sourced block still needs distributing even with no hand-authored GUIDELINES.md yet.
+    if (!hasSource && !payload.boostGuidelines) {
         return { artifactPaths: [], rows: [] };
     }
 
@@ -73,6 +77,7 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         }
 
         const { detail, status } = await writeGuidelines({
+            boostGuidelines: payload.boostGuidelines,
             guidelinesPath: agent.guidelinesPath,
             sourcePath: source,
             targetCwd: payload.context.cwd,
@@ -106,14 +111,18 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
 async function writeGuidelines(
     options: WriteGuidelinesOptions,
 ): Promise<WriteGuidelinesResult> {
-    const { guidelinesPath, sourcePath, targetCwd } = options;
+    const { boostGuidelines, guidelinesPath, sourcePath, targetCwd } = options;
 
     const target = join(targetCwd, guidelinesPath);
 
     try {
         const raw = (await filesystem.readFile(sourcePath)) ?? "";
 
-        const content = `${raw}${GUIDELINES_SUFFIX}`;
+        const boostBlock = boostGuidelines
+            ? `\n\n<laravel-boost-guidelines>\n${boostGuidelines}\n\n</laravel-boost-guidelines>\n`
+            : "";
+
+        const content = `${raw}${boostBlock}${GUIDELINES_SUFFIX}`;
 
         await filesystem.mkdir(dirname(target));
 

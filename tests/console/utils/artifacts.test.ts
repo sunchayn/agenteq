@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -93,6 +93,44 @@ describe("resolveCapabilities", () => {
 
     describe("nothing saved", () => {
         it("defaults to every capability, marking the result dirty", async () => {
+            const result = await resolveCapabilitiesToSync({
+                context: context,
+                only: undefined,
+            });
+
+            expect(result).toEqual({
+                capabilities: Object.values(AgentCapability),
+                isDirty: true,
+            });
+        });
+
+        it("drops skills from the default when boost.json lists a skill", async () => {
+            await writeFile(
+                join(cwd, "boost.json"),
+                JSON.stringify({ skills: ["boost"] }),
+            );
+
+            const result = await resolveCapabilitiesToSync({
+                context: context,
+                only: undefined,
+            });
+
+            expect(result).toEqual({
+                capabilities: [
+                    AgentCapability.Mcp,
+                    AgentCapability.Commands,
+                    AgentCapability.Guidelines,
+                ],
+                isDirty: true,
+            });
+        });
+
+        it("keeps skills in the default when boost.json lists no skill", async () => {
+            await writeFile(
+                join(cwd, "boost.json"),
+                JSON.stringify({ agents: ["claude_code"] }),
+            );
+
             const result = await resolveCapabilitiesToSync({
                 context: context,
                 only: undefined,

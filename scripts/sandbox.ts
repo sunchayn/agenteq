@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import detectAgentsAction from "@agents/actions/detect-agents-action.js";
@@ -8,7 +8,6 @@ import output from "@infrastructure/terminal/output.js";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sandboxDir = join(rootDir, ".sandbox");
-const exampleDir = join(rootDir, "examples/basic");
 
 await main();
 
@@ -20,8 +19,11 @@ async function main(): Promise<void> {
     const { values } = parseArgs({
         options: {
             agents: { type: "string" },
+            example: { type: "string", default: "basic" },
         },
     });
+
+    const exampleDir = await resolveExampleDir(values.example);
 
     await filesystem.remove(sandboxDir);
     await filesystem.copy({ source: exampleDir, target: sandboxDir });
@@ -47,8 +49,7 @@ async function main(): Promise<void> {
     output.info(`Agents: ${agents.join(", ")}`);
 
     await run("npm", ["run", "build"], rootDir);
-    // Some agents may only have a global, "~"-relative config file.
-    // Pointing HOME/USERPROFILE at the sandbox keeps those writes contained instead of touching the real user's home directory.
+
     await run(
         "node",
         [
@@ -59,11 +60,28 @@ async function main(): Promise<void> {
             "--yes",
         ],
         sandboxDir,
+        // Some agents may only have a global, "~"-relative config file.
+        // Pointing HOME/USERPROFILE at the sandbox keeps those writes contained instead of touching the real user's home directory.
         {
             HOME: sandboxDir,
             USERPROFILE: sandboxDir,
         },
     );
+}
+
+/**
+ * Resolves an --example value. A bare name, such as "laravel-boost", resolves under examples/.
+ */
+async function resolveExampleDir(example: string): Promise<string> {
+    if (isAbsolute(example)) {
+        return example;
+    }
+
+    const builtIn = join(rootDir, "examples", example);
+
+    return (await filesystem.exists(builtIn))
+        ? builtIn
+        : join(process.cwd(), example);
 }
 
 function run(
