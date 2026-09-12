@@ -175,7 +175,7 @@ describe("agenteq sync: auto-detection", () => {
         infoSpy.mockRestore();
     });
 
-    it("sets exitCode 1 when the saved agents file resolves to no agents", async () => {
+    it("sets exitCode 0 when the saved agents file resolves to no agents", async () => {
         await saveAgentsFileAction({
             agentNames: [],
             capabilities: Object.values(AgentCapability),
@@ -197,7 +197,7 @@ describe("agenteq sync: auto-detection", () => {
         writeSpy.mockRestore();
 
         expect(detectAgentsMock).not.toHaveBeenCalled();
-        expect(process.exitCode).toBe(1);
+        expect(process.exitCode).toBeFalsy();
     });
 
     it("sets exitCode 1 when nothing is detected and nothing was specified", async () => {
