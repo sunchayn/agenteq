@@ -75,7 +75,7 @@ export function registerSyncCommand(program: Command): void {
                 agentsToSync;
 
             if (agents.length === 0) {
-                process.exitCode = 1;
+                process.exitCode = 0;
 
                 printMessage({
                     isJson: options.isJson,
