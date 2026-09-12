@@ -1,6 +1,6 @@
 {
     "name": "agenteq",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "A single-source CLI tool to compile and publish repository rules, skills, commands, and MCP configurations to the developer's local AI agents.",
     "keywords": [
         "ai",
