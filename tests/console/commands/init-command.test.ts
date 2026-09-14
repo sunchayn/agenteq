@@ -32,6 +32,17 @@ vi.mock("@infrastructure/terminal/input.js", () => ({
     },
 }));
 
+const { isCIMock } = vi.hoisted(() => ({ isCIMock: vi.fn() }));
+
+vi.mock("@clack/prompts", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@clack/prompts")>();
+
+    return {
+        ...actual,
+        isCI: isCIMock,
+    };
+});
+
 const { registerInitCommand } = await import("@console/commands/init.js");
 
 let originalCwd: string;
@@ -49,6 +60,8 @@ beforeEach(async () => {
     context = { cwd: cwd, sourceDir: ".ai" };
     detectAgentsMock.mockReset();
     multiselectMock.mockReset();
+    isCIMock.mockReset();
+    isCIMock.mockReturnValue(false);
     process.exitCode = 0;
 });
 
@@ -285,5 +298,57 @@ describe("agenteq init: non-interactive fallback", () => {
         expect(process.exitCode).toBe(1);
 
         outputSpy.mockRestore();
+    });
+});
+
+describe("agenteq init: --skip-in-ci", () => {
+    it("does nothing when run in CI with --skip-in-ci", async () => {
+        isCIMock.mockReturnValue(true);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "init",
+            "--yes",
+            "--json",
+            "--skip-in-ci",
+        ]);
+
+        expect(detectAgentsMock).not.toHaveBeenCalled();
+        expect(await readAgentsFile(context)).toBeUndefined();
+        expect(process.exitCode).toBeFalsy();
+    });
+
+    it("runs normally in CI without --skip-in-ci", async () => {
+        isCIMock.mockReturnValue(true);
+        detectAgentsMock.mockResolvedValue(detected([claudeCode, true]));
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "init",
+            "--yes",
+            "--json",
+        ]);
+
+        expect(await readAgentsFile(context)).toEqual(["claude_code"]);
+        expect(process.exitCode).toBeFalsy();
+    });
+
+    it("runs normally outside CI with --skip-in-ci", async () => {
+        isCIMock.mockReturnValue(false);
+        detectAgentsMock.mockResolvedValue(detected([claudeCode, true]));
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "init",
+            "--yes",
+            "--json",
+            "--skip-in-ci",
+        ]);
+
+        expect(await readAgentsFile(context)).toEqual(["claude_code"]);
+        expect(process.exitCode).toBeFalsy();
     });
 });

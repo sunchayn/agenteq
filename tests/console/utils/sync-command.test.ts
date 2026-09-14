@@ -8,6 +8,7 @@ const ENV_KEYS = [
     "AGENTEQ_YES",
     "AGENTEQ_JSON",
     "AGENTEQ_SOURCE_DIR",
+    "AGENTEQ_SKIP_IN_CI",
 ];
 
 afterEach(() => {
@@ -46,6 +47,21 @@ describe("resolveCommonSyncOptions", () => {
 
         expect(resolved.shouldSkipPrompts).toBe(false);
         expect(resolved.isJson).toBe(false);
+        expect(resolved.shouldSkipInCi).toBe(false);
+    });
+
+    it("falls back to AGENTEQ_SKIP_IN_CI when --skip-in-ci is absent", () => {
+        process.env.AGENTEQ_SKIP_IN_CI = "1";
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.shouldSkipInCi).toBe(true);
+    });
+
+    it("--skip-in-ci takes precedence over AGENTEQ_SKIP_IN_CI", () => {
+        process.env.AGENTEQ_SKIP_IN_CI = "";
+        const resolved = resolveCommonSyncOptions({ skipInCi: true });
+
+        expect(resolved.shouldSkipInCi).toBe(true);
     });
 
     it("defaults sourceDir to .ai with nothing set", () => {

@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { isCI } from "@clack/prompts";
 import input from "@infrastructure/terminal/input.js";
 import detectAgentsAction from "@agents/actions/detect-agents-action.js";
 import resolveBoostAgentsAction from "@agents/actions/resolve-boost-agents-action.js";
@@ -48,6 +49,10 @@ export function registerInitCommand(program: Command): void {
             "--source-dir <dir>",
             `canonical source directory to sync from (env: AGENTEQ_SOURCE_DIR, default: ${artifactsManager.DEFAULT_SOURCE_DIR})`,
         )
+        .option(
+            "--skip-in-ci",
+            "do nothing when run in a CI environment (env: AGENTEQ_SKIP_IN_CI)",
+        )
         .action(runInit);
 }
 
@@ -57,6 +62,16 @@ export function registerInitCommand(program: Command): void {
  */
 export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
     const options = resolveCommonSyncOptions(rawOptions);
+
+    if (options.shouldSkipInCi && isCI()) {
+        printMessage({
+            isJson: options.isJson,
+            level: "info",
+            message: "Running in CI. Skipping `agenteq init`.",
+        });
+
+        return;
+    }
 
     const context = {
         cwd: process.cwd(),

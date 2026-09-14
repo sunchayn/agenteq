@@ -34,6 +34,11 @@ Communication:
 * When the user asks a question, answer the question first. A question is not an instruction to start editing files. Wait for explicit instruction before making any change.
 * Keep status reports and summaries short and direct.
 
+Code changes:
+
+* Any change to `src/` that alters behavior, a new flag, a new branch, a fixed bug, gets a matching test added or updated under `tests/` in the same turn. See [write-tests](./.ai/skills/write-tests/SKILL.md) for where that test belongs and how it's structured.
+* Do not report a code change as done until its test is written and passing.
+
 Artifact management:
 
 * Every AI-generated artifact goes in `.ai/artifacts/`. Never `docs/`, never the project root. This includes:
