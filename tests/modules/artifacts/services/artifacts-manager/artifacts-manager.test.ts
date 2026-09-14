@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import artifactsManager from "@artifacts/services/artifacts-manager/index.js";
 import syncGuidelinesStage from "@artifacts/services/artifacts-manager/stages/sync-guidelines-stage.js";
 import syncSymlinkCapabilityStage from "@artifacts/services/artifacts-manager/stages/sync-symlink-capability-stage.js";
-import { GUIDELINES_SUFFIX } from "@artifacts/services/artifacts-manager/stubs/guidelines-suffix.js";
+import { guidelinesSuffix } from "@artifacts/services/artifacts-manager/stubs/guidelines-suffix.js";
 import filesystem from "@infrastructure/filesystem.js";
 import Agent, { type AgentOptions } from "@agents/entities/agent.js";
 import { createDetectionConfiguration } from "@agents/types/detection-configuration.js";
@@ -23,6 +23,8 @@ import type { McpServerMappers } from "@agents/types/mcp-server-mapper.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
+import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
+import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 
 const baseAgentOptions: AgentOptions = {
     detectProjectPathUsing: () => createDetectionConfiguration({}),
@@ -299,7 +301,7 @@ describe("artifactsManager.sync", () => {
         expect(outcome.gitignoreAlerts).toEqual([".mcp.json"]);
     });
 
-    it("still gitignores and flags an mcp config file whose entry already existed and needed no write", async () => {
+    it("still gitignores and flags an mcp config file whose entry already matched and needed no write", async () => {
         spawnSync("git", ["init", "--quiet"], { cwd: cwd });
         spawnSync("git", ["config", "user.email", "test@example.com"], {
             cwd: cwd,
@@ -309,7 +311,9 @@ describe("artifactsManager.sync", () => {
 
         await writeFile(
             join(cwd, ".mcp.json"),
-            JSON.stringify({ mcpServers: { example: { command: "npx" } } }),
+            JSON.stringify({
+                mcpServers: { example: { args: [], command: "npx" } },
+            }),
         );
 
         spawnSync("git", ["add", ".mcp.json"], { cwd: cwd });
@@ -335,6 +339,114 @@ describe("artifactsManager.sync", () => {
         expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(
             ".mcp.json",
         );
+    });
+
+    it("re-syncs an mcp entry whose canonical config changed since it was last written", async () => {
+        await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                key: "example",
+                type: "stdio",
+            }),
+        );
+
+        await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { args: ["--verbose"], command: "npx" },
+                key: "example",
+                type: "stdio",
+            }),
+        );
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.results[0].status).toBe(SyncStatus.Written);
+        expect(
+            JSON.parse(await readFile(join(cwd, ".mcp.json"), "utf8"))
+                .mcpServers.example,
+        ).toEqual({ args: ["--verbose"], command: "npx" });
+    });
+
+    it("removes an mcp entry whose canonical config no longer exists", async () => {
+        await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                key: "example",
+                type: "stdio",
+            }),
+        );
+
+        await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(
+            JSON.parse(await readFile(join(cwd, ".mcp.json"), "utf8"))
+                .mcpServers.example,
+        ).toBeDefined();
+
+        await rm(join(cwd, ".ai/mcp/example"), { recursive: true });
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(
+            outcome.results.find((result) => result.item === "example"),
+        ).toMatchObject({ status: SyncStatus.Removed });
+
+        expect(
+            JSON.parse(await readFile(join(cwd, ".mcp.json"), "utf8"))
+                .mcpServers.example,
+        ).toBeUndefined();
+    });
+
+    it("removes an mcp entry it never wrote, e.g. one a user added by hand, agenteq owns the whole map", async () => {
+        await writeFile(
+            join(cwd, ".mcp.json"),
+            JSON.stringify({
+                mcpServers: { "hand-added": { command: "something-else" } },
+            }),
+        );
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.results).toEqual([
+            {
+                agent: "Test Agent",
+                capability: AgentCapability.Mcp,
+                item: "hand-added",
+                status: SyncStatus.Removed,
+            },
+        ]);
+
+        expect(
+            JSON.parse(await readFile(join(cwd, ".mcp.json"), "utf8"))
+                .mcpServers["hand-added"],
+        ).toBeUndefined();
     });
 
     it("flags a guidelines file that was already committed before it got gitignored", async () => {
@@ -427,6 +539,148 @@ describe("artifactsManager.sync", () => {
     });
 });
 
+describe("syncMcpAction with a remote source", () => {
+    let cwd: string;
+    let remoteRoot: string;
+
+    const mcpAgent = new Agent({
+        ...baseAgentOptions,
+        mcp: createMcpConfiguration({
+            configPath: ".mcp.json",
+            entryMappers: {
+                remote: (server) => ({ url: server.url }),
+                stdio: (server) => ({
+                    args: server.args ?? [],
+                    command: server.command,
+                }),
+            },
+        }),
+    });
+
+    beforeEach(async () => {
+        cwd = await mkdtemp(join(tmpdir(), "agenteq-mcp-remote-"));
+        remoteRoot = await mkdtemp(join(tmpdir(), "agenteq-remote-root-"));
+
+        await mkdir(join(cwd, ".ai/mcp/local-only"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/local-only/config.json"),
+            JSON.stringify({
+                config: { command: "local" },
+                key: "local-only",
+                type: "stdio",
+            }),
+        );
+
+        await mkdir(join(cwd, ".ai/mcp/shared"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/shared/config.json"),
+            JSON.stringify({
+                config: { command: "local-shared" },
+                key: "shared",
+                type: "stdio",
+            }),
+        );
+
+        await mkdir(join(remoteRoot, "mcp/shared"), { recursive: true });
+        await writeFile(
+            join(remoteRoot, "mcp/shared/config.json"),
+            JSON.stringify({
+                config: { command: "remote-shared" },
+                key: "shared",
+                type: "stdio",
+            }),
+        );
+
+        await mkdir(join(remoteRoot, "mcp/remote-only"), { recursive: true });
+        await writeFile(
+            join(remoteRoot, "mcp/remote-only/config.json"),
+            JSON.stringify({
+                config: { command: "remote" },
+                key: "remote-only",
+                type: "stdio",
+            }),
+        );
+    });
+
+    afterEach(async () => {
+        await rm(cwd, { force: true, recursive: true });
+        await rm(remoteRoot, { force: true, recursive: true });
+    });
+
+    it("merges local and selected remote mcp servers, local winning a same-key collision", async () => {
+        await saveRemoteSourcesFileAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            remotes: {
+                team: {
+                    clonePath: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: ["shared", "remote-only"],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            },
+            shouldIgnore: false,
+        });
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [mcpAgent],
+        });
+
+        expect(outcome.hasFailed).toBe(false);
+
+        const written = JSON.parse(
+            await readFile(join(cwd, ".mcp.json"), "utf8"),
+        );
+
+        expect(Object.keys(written.mcpServers).sort()).toEqual([
+            "local-only",
+            "remote-only",
+            "shared",
+        ]);
+
+        expect(written.mcpServers.shared.command).toBe("local-shared");
+    });
+
+    it("never installs a remote mcp server that was not selected", async () => {
+        await saveRemoteSourcesFileAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            remotes: {
+                team: {
+                    clonePath: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            },
+            shouldIgnore: false,
+        });
+
+        await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [mcpAgent],
+        });
+
+        const written = JSON.parse(
+            await readFile(join(cwd, ".mcp.json"), "utf8"),
+        );
+
+        expect(Object.keys(written.mcpServers).sort()).toEqual([
+            "local-only",
+            "shared",
+        ]);
+    });
+});
+
 describe("syncGuidelinesAction", () => {
     let cwd: string;
 
@@ -463,7 +717,7 @@ describe("syncGuidelinesAction", () => {
 
         expect((await lstat(target)).isSymbolicLink()).toBe(false);
         expect(await readFile(target, "utf8")).toBe(
-            `# Hello\n${GUIDELINES_SUFFIX}`,
+            `# Hello\n${guidelinesSuffix({ remoteUrls: [] })}`,
         );
 
         expect(await readFile(join(cwd, ".gitignore"), "utf8")).toBe(
@@ -543,6 +797,153 @@ describe("syncGuidelinesAction", () => {
         expect(result.artifactPaths).toEqual(["OTHER.md"]);
 
         writeFileSpy.mockRestore();
+    });
+});
+
+describe("syncGuidelinesAction with a remote source", () => {
+    let cwd: string;
+    let remoteRoot: string;
+
+    beforeEach(async () => {
+        cwd = await mkdtemp(join(tmpdir(), "agenteq-guidelines-remote-"));
+        remoteRoot = await mkdtemp(join(tmpdir(), "agenteq-remote-root-"));
+
+        await mkdir(join(cwd, ".ai"), { recursive: true });
+        await writeFile(join(cwd, ".ai", "GUIDELINES.md"), "# Local\n");
+        await writeFile(join(remoteRoot, "GUIDELINES.md"), "# Remote\n");
+    });
+
+    afterEach(async () => {
+        await rm(cwd, { force: true, recursive: true });
+        await rm(remoteRoot, { force: true, recursive: true });
+    });
+
+    function payloadFor(
+        agent: Agent,
+        remoteSources: ResolvedRemoteSource[],
+    ): SyncPayload {
+        return new SyncPayload({
+            capabilities: [AgentCapability.Guidelines],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            remoteSources: remoteSources,
+            selectedAgents: [agent],
+        });
+    }
+
+    it("prepends the remote guidelines before the local ones when selected", async () => {
+        const agent = new Agent({
+            ...baseAgentOptions,
+            guidelinesPath: "CLAUDE.md",
+        });
+
+        await syncGuidelinesStage(
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: true,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        const content = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+
+        expect(content.indexOf("# Remote")).toBeLessThan(
+            content.indexOf("# Local"),
+        );
+
+        expect(content).toContain("git@example.com/team.git");
+    });
+
+    it("never mixes in the remote guidelines when they were not selected", async () => {
+        const agent = new Agent({
+            ...baseAgentOptions,
+            guidelinesPath: "CLAUDE.md",
+        });
+
+        await syncGuidelinesStage(
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        const content = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+
+        expect(content).not.toContain("# Remote");
+    });
+
+    it("prepends every remote's guidelines, in configured order, before the local ones", async () => {
+        const secondRemoteRoot = await mkdtemp(
+            join(tmpdir(), "agenteq-guidelines-remote2-"),
+        );
+
+        await writeFile(
+            join(secondRemoteRoot, "GUIDELINES.md"),
+            "# Second remote\n",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            guidelinesPath: "CLAUDE.md",
+        });
+
+        await syncGuidelinesStage(
+            payloadFor(agent, [
+                {
+                    name: "first",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: true,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/first.git",
+                },
+                {
+                    name: "second",
+                    rootDir: secondRemoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: true,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/second.git",
+                },
+            ]),
+        );
+
+        const content = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+
+        expect(content.indexOf("# Remote")).toBeLessThan(
+            content.indexOf("# Second remote"),
+        );
+
+        expect(content.indexOf("# Second remote")).toBeLessThan(
+            content.indexOf("# Local"),
+        );
+
+        expect(content).toContain("git@example.com/first.git");
+        expect(content).toContain("git@example.com/second.git");
+
+        await rm(secondRemoteRoot, { force: true, recursive: true });
     });
 });
 
@@ -763,5 +1164,180 @@ describe("syncSymlinkCapabilityAction", () => {
         expect(result.artifactPaths).toEqual([".test/commands2"]);
 
         globSpy.mockRestore();
+    });
+});
+
+describe("syncSymlinkCapabilityAction with a remote source", () => {
+    let cwd: string;
+    let remoteRoot: string;
+
+    beforeEach(async () => {
+        cwd = await mkdtemp(join(tmpdir(), "agenteq-symlink-remote-"));
+        remoteRoot = await mkdtemp(join(tmpdir(), "agenteq-remote-root-"));
+
+        await mkdir(join(cwd, ".ai/commands"), { recursive: true });
+        await writeFile(join(cwd, ".ai/commands/local.md"), "local");
+
+        await mkdir(join(remoteRoot, "commands"), { recursive: true });
+        await writeFile(join(remoteRoot, "commands/shared.md"), "shared");
+        await writeFile(join(remoteRoot, "commands/local.md"), "remote copy");
+    });
+
+    afterEach(async () => {
+        await rm(cwd, { force: true, recursive: true });
+        await rm(remoteRoot, { force: true, recursive: true });
+    });
+
+    function payloadFor(
+        agent: Agent,
+        remoteSources: ResolvedRemoteSource[],
+    ): SyncPayload {
+        return new SyncPayload({
+            capabilities: [AgentCapability.Commands],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            remoteSources: remoteSources,
+            selectedAgents: [agent],
+        });
+    }
+
+    it("mirrors selected remote items alongside local ones", async () => {
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        const result = await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["shared.md", "local.md"],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        expect(result.results[0].item).toBe("2 file(s)");
+
+        const target = join(cwd, ".test/commands");
+
+        expect(await readFile(join(target, "local.md"), "utf8")).toBe("local");
+        expect(await readFile(join(target, "shared.md"), "utf8")).toBe(
+            "shared",
+        );
+    });
+
+    it("never mirrors a remote item that was not selected", async () => {
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        const result = await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        expect(result.results[0].item).toBe("1 file(s)");
+        expect(
+            await filesystem.exists(join(cwd, ".test/commands/shared.md")),
+        ).toBe(false);
+    });
+
+    it("lets a local item win a same-name collision against the remote source", async () => {
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["shared.md", "local.md"],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        expect(
+            await readFile(join(cwd, ".test/commands/local.md"), "utf8"),
+        ).toBe("local");
+    });
+
+    it("lets the first remote win a same-name collision against a later remote", async () => {
+        const secondRemoteRoot = await mkdtemp(
+            join(tmpdir(), "agenteq-remote-root2-"),
+        );
+
+        await mkdir(join(secondRemoteRoot, "commands"), { recursive: true });
+        await writeFile(
+            join(secondRemoteRoot, "commands/shared.md"),
+            "second remote copy",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "first",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["shared.md"],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/first",
+                },
+                {
+                    name: "second",
+                    rootDir: secondRemoteRoot,
+                    selection: {
+                        commands: ["shared.md"],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/second",
+                },
+            ]),
+        );
+
+        expect(
+            await readFile(join(cwd, ".test/commands/shared.md"), "utf8"),
+        ).toBe("shared");
+
+        await rm(secondRemoteRoot, { force: true, recursive: true });
     });
 });

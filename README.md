@@ -8,13 +8,13 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Coverage](https://img.shields.io/codecov/c/github/sunchayn/agenteq?style=flat-square)](https://codecov.io/gh/sunchayn/agenteq)
 
-[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Usage](#usage) • [Supported agents](#supported-agents) • [Using it with Laravel Boost](#using-it-with-laravel-boost)
-
 **A single source of truth for AI coding agents configuration.**<br />
-Agenteq reads guidelines, MCP servers, skills, and commands from one centralized folder, detects installed agents, and generate each relevant artifact in the path/format the agent expects.
+Agenteq reads guidelines, MCP servers, skills, and commands from one canonical source directory, detects installed agents, and generate each relevant artifact in the path/format the agent expects.
 It lets you configure everything once, regardless of which agents your collaborators use, and keeps the generated files out of the repo.
 
 ![agenteq.png](art/agenteq.png)
+
+[Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Combining a remote source](#combining-a-remote-source) • [Using it with Laravel Boost](#using-it-with-laravel-boost) • [MCP config](#mcp-config) • [Supported agents](#supported-agents)
 
 ## Getting started
 
@@ -39,6 +39,9 @@ npx agenteq init
 This looks at your machine and project, finds which agents are installed, lets you confirm or change the list, and generates the first set of artifacts for each agent.
 
 See [`examples/basic`](/examples/basic) for a basic configuration example.
+
+> [!TIP]
+> You can also use agenteq to sync across remote repositories. Check out [this Guide](#combining-a-remote-source).
 
 ## Migrating an existing repo
 
@@ -92,7 +95,7 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 4. Otherwise, `sync` found nothing and there is no saved list yet, so it falls back to the `init` flow.
 
 > [!TIP]
-> You can add `agenteq sync` to a git hook, running it whenever changes to the `.ai` folder are detected.
+> You can add `agenteq sync` to a git hook, running it whenever changes to the canonical source directory (`.ai` by default) are detected.
 
 ### Options shared by `init` and `sync`
 
@@ -102,31 +105,140 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 | `--only <mcp,commands,skills,guidelines>` | Sync only some of the four capabilities instead of all of them, for example `--only guidelines,skills`.                                                                                                                        |
 | `--yes`                                   | Run without prompts.<br />If `agenteq` cannot determine what to do automatically, it fails with an error instead.                                                                                                              |
 | `--json`                                  | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
-| `--source-dir <dir>`                      | The canonical source folder. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                             |
+| `--source-dir <dir>`                      | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
 | `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
 
 Each flag above also has an environment variable equivalent, useful for setting it once in CI. They are `AGENTEQ_AGENTS`, `AGENTEQ_ONLY`, `AGENTEQ_YES`, `AGENTEQ_JSON`, `AGENTEQ_SOURCE_DIR`, and `AGENTEQ_SKIP_IN_CI`. A CLI flag always overrides its matching environment variable.
 
-The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer and per machine, not shared through git. The first time `agenteq` generates it, it also adds the path to `.gitignore`.
+The saved choice is stored at `<source-dir>/agenteq.json`, which also tracks which mcp server keys `sync` last installed into each agent's config file, so a server dropped from the canonical source gets removed from that file too on the next sync. It is per developer and per machine, not shared through git. The first time `agenteq` generates it, it also adds the path to `.gitignore`.
 
 > [!TIP]
 > In CI, if no agents are configured, no file is saved, and `--agents` is not set, `sync` fails immediately with an error instead. Passing `--agents`, or setting `AGENTEQ_AGENTS`, avoids this.<br />CI is detected automatically, and you can also force this same non-interactive behavior with `--yes` or `--json`.
 
-### Global option
+## Advanced Usage
 
-| Flag      | What it does                                                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------- |
-| `--debug` | Print the full error stack trace to stderr if a command fails unexpectedly. Same as `DEBUG=agenteq`. |
+### Combining a remote source
+
+Alongside your local canonical source directory, you can point Agenteq at any number of named remote git repositories, each with the same layout, `mcp/`, `commands/`, `skills/`, `GUIDELINES.md` at its root. Agenteq combines every source into one set of synced artifacts.
+
+On `local <> remote` collision, local wins and on `remote <> remote` collection, whichever remote was added first wins.
+
+```mermaid
+flowchart LR
+    R3["Remote Repository 3"] -..-> C
+    R2["Remote Repository 2"] -..-> C
+    R1["Remote Repository"] ---> C
+    L["Local .ai/"] --> C["sync"]
+    L -. "Overrides remote on collision" .-> C
+
+    C --> G["Agent guidelines files\n<small>(concatenated, every source in order)</small>"]
+    C --> S["Agent skills\n<small>(symlinked)</small>"]
+    C --> Cmd["Agent commands\n<small>(symlinked)</small>"]
+    C --> M["Agent MCP config files\n<small>(transformed into one file)</small>"]
+
+    G --> D["Distribute to all configured agents\n<small>(Claude, Cursor, Codex, etc.)</small>"]
+    S --> D
+    Cmd --> D
+    M --> D
+
+    classDef source fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:1px;
+    classDef optional fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:1px,stroke-dasharray:4 3;
+    classDef sync fill:#fde68a,stroke:#b45309,color:#78350f,stroke-width:3px;
+    classDef output fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1px;
+    classDef distribute fill:#ede9fe,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px;
+
+    class L,R1 source
+    class R2,R3 optional
+    class C sync
+    class G,S,Cmd,M output
+    class D distribute
+```
+
+#### Available commands
+
+```bash
+npx agenteq remote-source add <name> <git-url>    # clone it, pick what to sync, attach it to Agenteq
+npx agenteq remote-source list                    # list every configured remote source
+npx agenteq remote-source update-choices <name>   # change what you previously picked from
+npx agenteq remote-source remove <name>           # deattach it from Agenteq
+```
+
+| Flag                 | Applies to                                | What it does                                                                                            |
+| -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `--path <dir>`       | `add`                                     | Where to clone the repository, skips the location prompt.                                               |
+| `--ignored`          | `add`                                     | Keep the saved configuration out of git, personal to this machine, instead of shared with the project.  |
+| `--yes`              | `add`                                     | Run non-interactively; everything found is selected instead of opening the picker (env: `AGENTEQ_YES`). |
+| `--json`             | `add`, `list`, `update-choices`, `remove` | Print machine-readable JSON instead of text or a table (env: `AGENTEQ_JSON`).                           |
+| `--source-dir <dir>` | `add`, `list`, `update-choices`, `remove` | Canonical source directory (env: `AGENTEQ_SOURCE_DIR`, default: `.ai`).                                 |
+
+> [!NOTE]
+> `update-choices` always needs an interactive terminal for its picker.
+
+## Using it with Laravel Boost
+
+At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and `agenteq` are doing the same thing. However, they are slightly different and can be combined.
+
+- **Laravel Boost** inspects the packages you actually have installed and generates guidelines and skills content from that. It writes this content into each real agent it is configured for, for example `CLAUDE.md` and `.claude/skills` for Claude Code, and it exposes its own MCP server, `boost:mcp`.
+- **Agenteq** takes your own canonical guidelines, commands, skills, and MCP servers, and distributes them into every agent you support.
+
+Therefore, Laravel Boost will generate the proper guidelines for your project and the skills for every configured agent. Then Agenteq run on top of that to distribute the Commands (Boost doesn't sync this) and the [project MCPs](#mcp-config) to all agents.
+
+To make them work together, first install Boost
+
+```bash
+php artisan boost:install --guidelines --skills && npx agenteq init --yes
+```
+
+then run the sync using this combination
+
+```bash
+php artisan boost:update && npx agenteq sync
+```
+
+If your project already runs Laravel Boost, you don't need to do anything by hand. Instead, you can use the following skill:
+
+```bash
+npx skills add https://github.com/sunchayn/agenteq --skill add-agenteq-to-boost-project
+```
+
+Then invoke it via `/add-agenteq-to-boost-project`. It will take care of transforming your project to wire Agenteq on top of Laravel Boost and doing any necessary reconciliation.
+
+### How does it work behind the scenes
+
+Agenteq reads `boost.json`, the file Boost writes naming which agent(s) it targeted, then pipes what Boost generated into its own sync, capability by capability:
+
+- **Guidelines.** Boost's `<laravel-boost-guidelines>` block is appended to `.ai/GUIDELINES.md`'s content, in every agent's own guidelines file. Then git ignore all guidelines.
+- **Skills.** Left entirely to Boost. When `boost.json` lists at least one skill, agenteq drops `skills` from its own default capability list, so it never syncs that capability for this project. It still git ignores the relevant skill directories.
+- **Commands.** Agenteq takes full control over this.
+- **MCP servers.** Agenteq takes full control over this. To enable Laravel Boost MCP, define it yourself under `.ai/mcp/laravel-boost/config.json`, the same way as any other MCP server (see [MCP config](#mcp-config)):
+
+    ```json
+    {
+        "key": "laravel-boost",
+        "type": "stdio",
+        "config": { "command": "php", "args": ["artisan", "boost:mcp"] }
+    }
+    ```
+
+See [`examples/laravel-boost`](/examples/laravel-boost) for a Laravel Boost example.
 
 ### Error codes
 
 If a command fails, the error message starts with a code in parentheses, for example `(E_UNKNOWN_AGENT) Unknown agent "foo".`. Search this table for that code to see what it means.
 
-| Code                   | What it means                                                                                                                      |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `E_UNKNOWN_AGENT`      | An agent name you passed, for example to `--agents`, does not match any supported agent. Run `agenteq detect` for the exact names. |
-| `E_UNKNOWN_CAPABILITY` | A capability name you passed to `--only` does not match one of `mcp`, `commands`, `skills`, `guidelines`.                          |
-| `E_INVALID_MCP_CONFIG` | A file under `.ai/mcp/<name>/config.json` is not valid JSON, or does not match the shape described below.                          |
+| Code                                 | What it means                                                                                                                                                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `E_UNKNOWN_AGENT`                    | An agent name you passed, for example to `--agents`, does not match any supported agent. Run `agenteq detect` for the exact names.                                                                                       |
+| `E_UNKNOWN_CAPABILITY`               | A capability name you passed to `--only` does not match one of `mcp`, `commands`, `skills`, `guidelines`.                                                                                                                |
+| `E_INVALID_MCP_CONFIG`               | A file under `.ai/mcp/<name>/config.json` is not valid JSON, or does not match the shape described below.                                                                                                                |
+| `E_INVALID_REMOTE_SOURCE`            | The cloned repository has none of `mcp/`, `commands/`, `skills/`, or `GUIDELINES.md` at its root.                                                                                                                        |
+| `E_REMOTE_SOURCE_ALREADY_EXISTS`     | The `remote-source add` was given a name that's already configured. Remove it first, or pick a different name.                                                                                                           |
+| `E_REMOTE_SOURCE_URL_ALREADY_EXISTS` | `remote-source add` was given a git url that's already configured under another name. Use that remote, remove it first, or pick a different url.                                                                         |
+| `E_REMOTE_SOURCE_CLONE_FAILED`       | The `remote-source add` could not clone the given url, see the printed detail for the underlying git error.                                                                                                              |
+| `E_REMOTE_SOURCE_PATH_CONFLICT`      | The clone location already holds something that is not a clone of the same repository. Make sure you are using the same URL as the repo's configure remote (pay attention to SSH vs HTTP). Or pick a different `--path`. |
+| `E_REMOTE_SOURCE_NOT_CONFIGURED`     | The `remote-source update-choices <name>` was run with no remote source saved under that name. Run `remote-source add <name> <git-url>` first.                                                                           |
+| `E_REMOTE_SOURCE_NEEDS_PROMPT`       | The `remote-source update-choices` needs an interactive terminal for its picker, it cannot run with `--yes` or in CI.                                                                                                    |
+| `E_REMOTE_SOURCE_CANCELLED`          | The picker prompt in `remote-source add`/`update-choices` was cancelled.                                                                                                                                                 |
 
 ### MCP config
 
@@ -158,7 +270,15 @@ Any other field you place under `config` is not rejected. It is copied directly 
 > [!IMPORTANT]
 > Junie has no native `http`/`sse` support, so agenteq rewrites those entries into a stdio call to `mcp-remote` instead. `headers` and any other `config` fields are dropped in that conversion.
 
-## Supported agents
+## Configuration
+
+### Global option
+
+| Flag      | What it does                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| `--debug` | Print the full error stack trace to stderr if a command fails unexpectedly. Same as `DEBUG=agenteq`. |
+
+### Supported agents
 
 Not every agent supports every capability. The table below shows what agenteq can write for each one.
 
@@ -190,54 +310,6 @@ Not every agent supports every capability. The table below shows what agenteq ca
 A "No" here reflects that agent's own conventions, not a limitation of `agenteq`. For example, Pi has no MCP support of its own, so `agenteq` has nothing to write there.
 
 Detection methods vary by agent. Some rely on a CLI command, others on a project marker files or an install-folder pattern instead. Run `agenteq detect` on your machine to see what is actually installed.
-
-## Using it with Laravel Boost
-
-At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and `agenteq` are doing the same thing. However, they are slightly different and can be combined.
-
-- **Laravel Boost** inspects the packages you actually have installed and generates guidelines and skills content from that. It writes this content into each real agent it is configured for, for example `CLAUDE.md` and `.claude/skills` for Claude Code, and it exposes its own MCP server, `boost:mcp`.
-- **Agenteq** takes your own canonical guidelines, commands, skills, and MCP servers, and distributes them into every agent you support.
-
-Therefore, Laravel Boost will generate the proper guidelines for your project and the skills for every configured agent. Then Agenteq run on top of that to distribute the Commands (Boost doesn't sync this) and the [project MCPs](#mcp-config) to all agents.
-
-To make them work together, first install Boost
-
-```bash
-php artisan boost:install --guidelines --skills && npx agenteq init --yes
-```
-
-then run the sync using this combination
-
-```bash
-php artisan boost:update && npx agenteq sync
-```
-
-If your project already runs Laravel Boost, you don't need to do anything by hand. Instead you can use the following skill:
-
-```bash
-npx skills add https://github.com/sunchayn/agenteq --skill add-agenteq-to-boost-project
-```
-
-Then invoke it via `/add-agenteq-to-boost-project`. It will take care of transforming your project to wire Agenteq on top of Laravel Boost and doing any necessary reconciliation.
-
-### How does it work behind the scenes
-
-Agenteq reads `boost.json`, the file Boost writes naming which agent(s) it targeted, then pipes what Boost generated into its own sync, capability by capability:
-
-- **Guidelines.** Boost's `<laravel-boost-guidelines>` block is appended to `.ai/GUIDELINES.md`'s content, in every agent's own guidelines file. Then git ignore all guidelines.
-- **Skills.** Left entirely to Boost. When `boost.json` lists at least one skill, agenteq drops `skills` from its own default capability list, so it never syncs that capability for this project. It still git ignores the relevant skill directories.
-- **Commands.** Agenteq takes full control over this.
-- **MCP servers.** Agenteq takes full control over this. To enable Laravel Boost MCP, define it yourself under `.ai/mcp/laravel-boost/config.json`, the same way as any other MCP server (see [MCP config](#mcp-config)):
-
-    ```json
-    {
-        "key": "laravel-boost",
-        "type": "stdio",
-        "config": { "command": "php", "args": ["artisan", "boost:mcp"] }
-    }
-    ```
-
-See [`examples/laravel-boost`](/examples/laravel-boost) for a Laravel Boost example.
 
 ## Contributing
 

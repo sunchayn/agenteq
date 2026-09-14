@@ -1,23 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { isCancelMock, isCIMock, isTTYMock, multiselectMock } = vi.hoisted(
-    () => ({
-        isCancelMock: vi.fn(),
-        isCIMock: vi.fn(),
-        isTTYMock: vi.fn(),
-        multiselectMock: vi.fn(),
-    }),
-);
+const {
+    confirmMock,
+    isCancelMock,
+    isCIMock,
+    isTTYMock,
+    multiselectMock,
+    textMock,
+} = vi.hoisted(() => ({
+    confirmMock: vi.fn(),
+    isCancelMock: vi.fn(),
+    isCIMock: vi.fn(),
+    isTTYMock: vi.fn(),
+    multiselectMock: vi.fn(),
+    textMock: vi.fn(),
+}));
 
 vi.mock("@clack/prompts", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@clack/prompts")>();
 
     return {
         ...actual,
+        confirm: confirmMock,
         isCancel: isCancelMock,
         isCI: isCIMock,
         isTTY: isTTYMock,
         multiselect: multiselectMock,
+        text: textMock,
     };
 });
 
@@ -79,5 +88,33 @@ describe("input.multiselect", () => {
         ]);
 
         expect(multiselectMock).toHaveBeenCalledWith(params);
+    });
+});
+
+describe("input.text", () => {
+    it("forwards params to clack and resolves with its answer", async () => {
+        textMock.mockResolvedValue("~/.agenteq/sources/team");
+
+        const params = {
+            defaultValue: "~/.agenteq/sources/team",
+            message: "Where should this be cloned",
+        };
+
+        await expect(input.text(params)).resolves.toBe(
+            "~/.agenteq/sources/team",
+        );
+
+        expect(textMock).toHaveBeenCalledWith(params);
+    });
+});
+
+describe("input.confirm", () => {
+    it("forwards params to clack and resolves with its answer", async () => {
+        confirmMock.mockResolvedValue(true);
+
+        const params = { message: "Include GUIDELINES.md" };
+
+        await expect(input.confirm(params)).resolves.toBe(true);
+        expect(confirmMock).toHaveBeenCalledWith(params);
     });
 });

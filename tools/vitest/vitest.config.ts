@@ -1,10 +1,13 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
+const rootDir = fileURLToPath(new URL("../..", import.meta.url));
+
 export default defineConfig({
     plugins: [tsconfigPaths()],
-    root: fileURLToPath(new URL("../..", import.meta.url)),
+    root: rootDir,
     test: {
         coverage: {
             exclude: ["src/modules/agents/definitions/**", "src/cli.ts"],
@@ -18,8 +21,7 @@ export default defineConfig({
                 statements: 80,
             },
         },
-        exclude: ["**/node_modules/**", ".ai/**"],
-        include: ["tests/**/*.test.ts"],
+        include: [path.resolve(rootDir, "tests/**/*.test.ts")],
         // picocolors treats any CI environment as color-capable,
         // so without this, tests asserting plain-text output break under CI.
         env: { NO_COLOR: "1" },

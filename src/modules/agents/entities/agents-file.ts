@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { RunContext } from "@shared/types/run-context.js";
 
 /**
- * agenteq's own saved file listing which agents and capabilities a project uses.
+ * Agenteq's own saved file listing which agents and capabilities a project uses.
  * The file is saved at <source-dir>/agenteq.json.
  */
 export default class AgentsFile {
@@ -28,12 +28,16 @@ export default class AgentsFile {
         return new AgentsFile(agentNames, capabilities);
     }
 
+    static empty(): AgentsFile {
+        return new AgentsFile([], undefined);
+    }
+
     static path(context: RunContext): string {
         return join(context.cwd, context.sourceDir, AgentsFile.FILENAME);
     }
 
     /**
-     * Parses the saved file, or null when the JSON is invalid or malformed.
+     * Parses the saved file, or null when `agents` itself is invalid or malformed.
      */
     static parse(raw: string): AgentsFile | null {
         let parsed: unknown;
@@ -53,8 +57,21 @@ export default class AgentsFile {
         return new AgentsFile(result.data.agents, result.data.capabilities);
     }
 
+    /**
+     * Returns a new file with the agent selection replaced, everything else kept as-is.
+     */
+    withAgents(
+        agentNames: string[],
+        capabilities: string[] | undefined,
+    ): AgentsFile {
+        return new AgentsFile(agentNames, capabilities);
+    }
+
     serialize(): string {
-        const body: { agents: string[]; capabilities?: string[] } = {
+        const body: {
+            agents: string[];
+            capabilities?: string[];
+        } = {
             agents: this.agentNames,
         };
 

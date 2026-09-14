@@ -19,44 +19,113 @@ function mapServer(s: McpServer): Record<string, unknown> {
 
 describe("jsonFormatter", () => {
     it("writes a new server entry into an empty file", () => {
-        const result = jsonFormatter.apply({
-            config: server,
+        const result = jsonFormatter.reconcile({
             keyPath: ["mcpServers"],
             mapper: mapServer,
+            servers: [server],
             text: "",
         });
 
-        expect(result.status).toBe("written");
+        expect(result.statusesByKey.get("example")).toBe("written");
         expect(JSON.parse(result.text).mcpServers.example).toEqual({
             args: ["-y", "example"],
             command: "npx",
         });
     });
 
-    it("skips an entry that already exists, returning the text unchanged", () => {
-        const first = jsonFormatter.apply({
-            config: server,
+    it("skips an entry that already matches, returning the text unchanged", () => {
+        const first = jsonFormatter.reconcile({
             keyPath: ["mcpServers"],
             mapper: mapServer,
+            servers: [server],
             text: "",
         });
 
-        const second = jsonFormatter.apply({
-            config: server,
+        const second = jsonFormatter.reconcile({
             keyPath: ["mcpServers"],
             mapper: mapServer,
+            servers: [server],
             text: first.text,
         });
 
-        expect(second.status).toBe("skipped");
+        expect(second.statusesByKey.get("example")).toBe("skipped");
         expect(second.text).toBe(first.text);
     });
 
+    it("re-writes an entry whose canonical config changed since it was last synced", () => {
+        const first = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [server],
+            text: "",
+        });
+
+        const changedServer = new McpStdioServer({
+            args: ["-y", "example", "--verbose"],
+            command: "npx",
+            key: "example",
+        });
+
+        const second = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [changedServer],
+            text: first.text,
+        });
+
+        expect(second.statusesByKey.get("example")).toBe("written");
+        expect(JSON.parse(second.text).mcpServers.example).toEqual({
+            args: ["-y", "example", "--verbose"],
+            command: "npx",
+        });
+    });
+
+    it("removes a manually added, unrelated server entry, agenteq owns the whole map", () => {
+        const text = JSON.stringify({
+            mcpServers: { "hand-added": { command: "something-else" } },
+        });
+
+        const result = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [server],
+            text: text,
+        });
+
+        const written = JSON.parse(result.text);
+
+        expect(written.mcpServers["hand-added"]).toBeUndefined();
+        expect(result.statusesByKey.get("hand-added")).toBe("removed");
+        expect(written.mcpServers.example).toEqual({
+            args: ["-y", "example"],
+            command: "npx",
+        });
+    });
+
+    it("removes a stale canonical entry no longer part of the desired set", () => {
+        const first = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [server],
+            text: "",
+        });
+
+        const second = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [],
+            text: first.text,
+        });
+
+        expect(second.statusesByKey.get("example")).toBe("removed");
+        expect(JSON.parse(second.text).mcpServers).toEqual({});
+    });
+
     it("writes into a nested key path without clobbering sibling keys", () => {
-        const result = jsonFormatter.apply({
-            config: server,
+        const result = jsonFormatter.reconcile({
             keyPath: ["amp", "mcpServers"],
             mapper: mapServer,
+            servers: [server],
             text: JSON.stringify({ amp: { otherSetting: true } }),
         });
 
@@ -67,5 +136,19 @@ describe("jsonFormatter", () => {
             args: ["-y", "example"],
             command: "npx",
         });
+    });
+
+    it("skips when an intermediate key holds a scalar value", () => {
+        const conflictingText = JSON.stringify({ mcpServers: "not an object" });
+
+        const result = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [server],
+            text: conflictingText,
+        });
+
+        expect(result.statusesByKey.size).toBe(0);
+        expect(result.text).toBe(conflictingText);
     });
 });

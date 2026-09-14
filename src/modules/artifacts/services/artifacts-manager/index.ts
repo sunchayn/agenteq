@@ -5,6 +5,7 @@ import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import { SyncOutcome } from "@artifacts/data-transfer-objects/sync-outcome.js";
 import warmUpBoostProjectStage from "./stages/warm-up-boost-project-stage.js";
+import resolveRemoteSourcesStage from "./stages/resolve-remote-sources-stage.js";
 import syncMcpStage from "./stages/sync-mcp-stage.js";
 import syncSymlinkCapabilityStage from "./stages/sync-symlink-capability-stage.js";
 import syncGuidelinesStage from "./stages/sync-guidelines-stage.js";
@@ -38,6 +39,7 @@ async function sync(options: SyncOptions): Promise<SyncOutcome> {
     });
 
     // Each stage reads only the previous's stage payload's original inputs and appends its own results.
+    payload = await resolveRemoteSourcesStage(payload);
     payload = await warmUpBoostProjectStage(payload);
     payload = await syncMcpStage(payload);
     payload = await syncSymlinkCapabilityStage(
@@ -55,6 +57,8 @@ async function sync(options: SyncOptions): Promise<SyncOutcome> {
 
     return new SyncOutcome({
         gitignoreAlerts: [...gitignoreAlerts],
+        remoteSourceWarnings: payload.remoteSourceWarnings,
+        requestedCapabilities: capabilities,
         results: payload.results,
         sourceDir: context.sourceDir,
     });

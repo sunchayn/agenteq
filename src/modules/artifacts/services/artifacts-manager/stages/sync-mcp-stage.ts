@@ -11,11 +11,13 @@ import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import discoverMcpServersAction from "@artifacts/actions/discover-mcp-servers-action.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
-import installMcpServerAction from "./mcp/actions/install-mcp-server-action.js";
+import reconcileMcpServersAction from "./mcp/actions/reconcile-mcp-servers-action.js";
 
 /**
- * Discovers the canonical MCP servers, then installs each into every selected agent,
- * marking an agent with no MCP support as unsupported.
+ * Discovers the canonical MCP servers, local plus a remote source's selected entries.
+ * Reconciles each selected agent's config file against that set, marking one with no MCP support as unsupported.
+ * Every server no longer in the set is removed from the file, agenteq owns the whole servers map,
+ * whether it put a stale entry there itself or not.
  */
 export default async function syncMcpStage(
     payload: SyncPayload,
@@ -33,20 +35,67 @@ export default async function syncMcpStage(
  * Interface & Types.
  */
 
-interface PendingInstall {
-    server: McpServer;
+interface FileWork {
     mcp: McpConfiguration;
-    filePath: string;
-    result: SyncResult;
+    agentDisplayNames: string[];
+    servers: McpServer[];
+}
+
+interface InstallMcpServersResult {
+    results: SyncResult[];
+    artifactPaths: string[];
+}
+
+interface CollectFileWorkOptions {
+    selectedAgents: Agent[];
+    servers: McpServer[];
+    cwd: string;
+}
+
+interface CollectFileWorkResult {
+    workByFile: Map<string, FileWork>;
+    results: SyncResult[];
 }
 
 /*
  * Internal.
  */
 
-interface InstallMcpServersResult {
-    results: SyncResult[];
-    artifactPaths: string[];
+/**
+ * Discovers local mcp servers, then every remote source's selected entries, in order.
+ * Local wins a same-key collision, then the first remote to claim a key wins.
+ */
+async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
+    const { cwd, sourceDir } = payload.context;
+
+    const localServers = await discoverMcpServersAction({
+        cwd: cwd,
+        sourceDir: sourceDir,
+    });
+
+    const servers = [...localServers];
+    const claimedKeys = new Set(localServers.map((server) => server.key));
+
+    for (const remote of payload.remoteSources) {
+        const remoteServers = await discoverMcpServersAction({
+            cwd: remote.rootDir,
+            sourceDir: ".",
+        });
+
+        for (const server of remoteServers) {
+            if (
+                !remote.selection.mcp.includes(server.key) ||
+                claimedKeys.has(server.key)
+            ) {
+                continue;
+            }
+
+            servers.push(server);
+            claimedKeys.add(server.key);
+        }
+    }
+
+    return servers;
 }
 
 async function installMcpServers(
@@ -54,12 +103,9 @@ async function installMcpServers(
 ): Promise<InstallMcpServersResult> {
     const { cwd } = payload.context;
 
-    const servers = await discoverMcpServersAction({
-        cwd: cwd,
-        sourceDir: payload.context.sourceDir,
-    });
+    const servers = await collectMcpServers(payload);
 
-    const { installsByFile, results } = collectPendingInstalls({
+    const { results, workByFile } = collectFileWork({
         cwd: cwd,
         selectedAgents: payload.selectedAgents,
         servers: servers,
@@ -67,12 +113,23 @@ async function installMcpServers(
 
     const artifactPaths: string[] = [];
 
-    for (const [filePath, installs] of installsByFile) {
-        await processFile(filePath, installs);
+    for (const [filePath, work] of workByFile) {
+        const statusesByKey = await processFile(filePath, work);
 
-        // Gitignore every resolved config path, even one left unwritten this run because its content already matched.
+        for (const agentDisplayName of work.agentDisplayNames) {
+            for (const [key, status] of statusesByKey) {
+                results.push({
+                    agent: agentDisplayName,
+                    capability: AgentCapability.Mcp,
+                    item: key,
+                    status: status,
+                });
+            }
+        }
+
         const relPath = relative(cwd, filePath);
 
+        // Gitignore every resolved config path, even one left unwritten this run because its content already matched.
         await git.ignore({ cwd: cwd, relPath: relPath });
         artifactPaths.push(relPath);
     }
@@ -80,59 +137,48 @@ async function installMcpServers(
     return { artifactPaths: artifactPaths, results: results };
 }
 
-interface CollectPendingInstallsOptions {
-    selectedAgents: Agent[];
-    servers: McpServer[];
-    cwd: string;
-}
-
-interface CollectPendingInstallsResult {
-    installsByFile: Map<string, PendingInstall[]>;
-    results: SyncResult[];
-}
-
 /**
- * Builds one result row per agent per server,
- * and groups the supported combinations into the pending installs destined for each target config file.
+ * Groups the canonical servers destined for each agent's config file, one file work entry per path.
+ * An agent with no MCP support gets an unsupported result row per server instead, and no file work.
  */
-function collectPendingInstalls(
-    options: CollectPendingInstallsOptions,
-): CollectPendingInstallsResult {
+function collectFileWork(
+    options: CollectFileWorkOptions,
+): CollectFileWorkResult {
     const { cwd, selectedAgents, servers } = options;
 
-    const installsByFile = new Map<string, PendingInstall[]>();
+    const workByFile = new Map<string, FileWork>();
     const results: SyncResult[] = [];
 
     for (const agent of selectedAgents) {
-        for (const server of servers) {
-            const result: SyncResult = {
-                agent: agent.displayName,
-                capability: AgentCapability.Mcp,
-                item: server.key,
-                status: SyncStatus.Unsupported,
-            };
-
-            results.push(result);
-
-            if (!agent.mcp) {
-                continue;
+        if (!agent.mcp) {
+            for (const server of servers) {
+                results.push({
+                    agent: agent.displayName,
+                    capability: AgentCapability.Mcp,
+                    item: server.key,
+                    status: SyncStatus.Unsupported,
+                });
             }
 
-            const filePath = resolveConfigPath(agent.mcp, cwd);
-            const installs = installsByFile.get(filePath) ?? [];
-
-            installs.push({
-                filePath: filePath,
-                mcp: agent.mcp,
-                result: result,
-                server: server,
-            });
-
-            installsByFile.set(filePath, installs);
+            continue;
         }
+
+        const filePath = resolveConfigPath(agent.mcp, cwd);
+        const existing = workByFile.get(filePath);
+
+        if (existing) {
+            existing.agentDisplayNames.push(agent.displayName);
+            continue;
+        }
+
+        workByFile.set(filePath, {
+            agentDisplayNames: [agent.displayName],
+            mcp: agent.mcp,
+            servers: servers,
+        });
     }
 
-    return { installsByFile: installsByFile, results: results };
+    return { results: results, workByFile: workByFile };
 }
 
 function resolveConfigPath(mcp: McpConfiguration, cwd: string): string {
@@ -160,37 +206,30 @@ function detectFormat(filePath: string): ConfigFileFormat {
 }
 
 /**
- * Reads one file once, applies every pending install destined for it in order, and writes it back only if any of them changed it.
+ * Reads one file once, reconciles its servers map against the canonical set,
+ * and writes it back only if that actually changed it.
+ * Returns the resulting status of every key that changed.
  */
 async function processFile(
     filePath: string,
-    installs: PendingInstall[],
-): Promise<boolean> {
+    work: FileWork,
+): Promise<Map<string, SyncStatus>> {
     const format = detectFormat(filePath);
     const originalText = (await filesystem.readFile(filePath)) ?? "";
 
-    let text = originalText;
-
-    for (const pending of installs) {
-        const installed = installMcpServerAction({
-            format: format,
-            mcp: pending.mcp,
-            server: pending.server,
-            text: text,
-        });
-
-        // Mutates the same object already stored in the stage's results list,
-        // so the status lands there without a separate write-back step.
-        pending.result.status = installed.status;
-        text = installed.text;
-    }
+    const { statusesByKey, text } = reconcileMcpServersAction({
+        format: format,
+        mcp: work.mcp,
+        servers: work.servers,
+        text: originalText,
+    });
 
     if (text === originalText) {
-        return false;
+        return statusesByKey;
     }
 
     await filesystem.mkdir(dirname(filePath));
     await filesystem.writeFile({ content: text, path: filePath });
 
-    return true;
+    return statusesByKey;
 }

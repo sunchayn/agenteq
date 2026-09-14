@@ -4,6 +4,7 @@
 export enum SyncStatus {
     Written = "written",
     Skipped = "skipped",
+    Removed = "removed",
     Unsupported = "unsupported",
     Failed = "failed",
 }

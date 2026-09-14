@@ -1,4 +1,5 @@
 import output from "@infrastructure/terminal/output.js";
+import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import type { SyncOutcome } from "@artifacts/data-transfer-objects/sync-outcome.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
@@ -11,18 +12,31 @@ import { renderAsJson, TableData } from "@console/utils/console.js";
 export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
     const { isJson, outcome } = options;
 
-    const { gitignoreAlerts, hasFailed, results, sourceDir } = outcome;
+    const {
+        gitignoreAlerts,
+        hasFailed,
+        remoteSourceWarnings,
+        results,
+        skippedCapabilities,
+        sourceDir,
+    } = outcome;
 
     if (isJson) {
         output.writeRaw(
             renderAsJson({
                 failed: hasFailed,
                 gitignoreAlerts: gitignoreAlerts,
+                remoteSourceWarnings: remoteSourceWarnings,
                 results: results,
+                skippedCapabilities: skippedCapabilities,
             }),
         );
 
         return;
+    }
+
+    for (const warning of remoteSourceWarnings) {
+        output.warn(warning);
     }
 
     if (results.length === 0) {
@@ -30,6 +44,7 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
             `Nothing to sync (no canonical sources found under ${sourceDir}/ or GUIDELINES.md).`,
         );
 
+        printSkippedCapabilitiesNote(skippedCapabilities);
         printOutSyncCompleted();
 
         return;
@@ -38,6 +53,8 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
     const { headers, rows } = renderAsTable(results);
 
     output.table(headers, rows);
+
+    printSkippedCapabilitiesNote(skippedCapabilities);
 
     if (gitignoreAlerts.length > 0) {
         printGitignoreAlert(gitignoreAlerts);
@@ -59,6 +76,25 @@ function printOutSyncCompleted(): void {
 
 function printOutSyncCompletedWithFailure(): void {
     output.outro("Sync finished with failures.");
+}
+
+/**
+ * Prints every capability this run skipped, since it wasn't requested.
+ */
+function printSkippedCapabilitiesNote(skipped: AgentCapability[]): void {
+    if (skipped.length === 0) {
+        return;
+    }
+
+    const list = skipped.join(", ");
+
+    output.warn(
+        `Skipped sync for non configured capabilities: ${pc.bold(list)}.`,
+    );
+
+    output.info(
+        `Run \`init\` or pass \`--only {capabilities}\` to update the list of capabilities.`,
+    );
 }
 
 /**

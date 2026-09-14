@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -6,7 +6,10 @@ import { join } from "node:path";
  * A standardized service for git operations.
  */
 const git = {
+    clone: clone,
     ignore: ignore,
+    pull: pull,
+    remoteUrl: remoteUrl,
     trackedPaths: trackedPaths,
 };
 
@@ -24,6 +27,24 @@ interface IgnoreOptions {
 interface TrackedPathsOptions {
     cwd: string;
     relPaths: string[];
+}
+
+interface CloneOptions {
+    url: string;
+    targetDir: string;
+}
+
+interface PullOptions {
+    cwd: string;
+}
+
+interface RemoteUrlOptions {
+    cwd: string;
+}
+
+interface GitCommandResult {
+    isSuccessful: boolean;
+    detail?: string;
 }
 
 /*
@@ -61,6 +82,64 @@ async function ignore(options: IgnoreOptions): Promise<void> {
     const prefix = contents.length > 0 && !contents.endsWith("\n") ? "\n" : "";
 
     await writeFile(gitignorePath, `${contents}${prefix}${relPath}\n`, "utf8");
+}
+
+/**
+ * Clones a repository into targetDir.
+ */
+async function clone(options: CloneOptions): Promise<GitCommandResult> {
+    const { targetDir, url } = options;
+
+    return runGitAsync(["clone", "--", url, targetDir]);
+}
+
+/**
+ * Fast-forward-only pulls an existing clone.
+ */
+async function pull(options: PullOptions): Promise<GitCommandResult> {
+    const { cwd } = options;
+
+    return runGitAsync(["pull", "--ff-only"], cwd);
+}
+
+/**
+ * Reads a clone's configured `origin` url, or undefined when it has none or isn't a git repository.
+ */
+function remoteUrl(options: RemoteUrlOptions): string | undefined {
+    const { cwd } = options;
+
+    const result = spawnSync("git", ["remote", "get-url", "origin"], {
+        cwd: cwd,
+        encoding: "utf8",
+    });
+
+    return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+/**
+ * Runs a git subcommand through the async, non-blocking `spawn`.
+ */
+function runGitAsync(args: string[], cwd?: string): Promise<GitCommandResult> {
+    return new Promise((resolvePromise) => {
+        const child = spawn("git", args, { cwd: cwd });
+
+        let stderr = "";
+
+        child.stderr.on("data", (chunk: Buffer) => {
+            stderr += chunk.toString();
+        });
+
+        child.on("error", (error) => {
+            resolvePromise({ detail: error.message, isSuccessful: false });
+        });
+
+        child.on("close", (code) => {
+            resolvePromise({
+                detail: code === 0 ? undefined : stderr.trim(),
+                isSuccessful: code === 0,
+            });
+        });
+    });
 }
 
 /**

@@ -158,6 +158,7 @@ async function pruneSymlinksInto(
 
         if (entry.isDirectory()) {
             await pruneSymlinksInto(entryPath, resolvedSourceDir);
+            await rmdirIfEmpty(entryPath);
             continue;
         }
 
@@ -179,5 +180,17 @@ async function pruneSymlinksInto(
         if (pointsIntoSource) {
             await rm(entryPath, { force: true });
         }
+    }
+}
+
+/**
+ * Removes a directory left with nothing in it once pruning is done,
+ * so a symlink nested a level or more deep doesn't leave its wrapper folders behind.
+ */
+async function rmdirIfEmpty(dir: string): Promise<void> {
+    const remaining = await readdir(dir).catch(() => null);
+
+    if (remaining?.length === 0) {
+        await rm(dir, { force: true, recursive: true });
     }
 }
