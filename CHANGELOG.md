@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.3.1](https://github.com/sunchayn/agenteq/compare/v1.3.0...v1.3.1) (2026-09-14)
 
-
 ### Fixed
 
-* **git:** don't ignore what is already ignored ([#20](https://github.com/sunchayn/agenteq/issues/20)) ([a05bf2f](https://github.com/sunchayn/agenteq/commit/a05bf2f8078d5558aec939ebe831f1fef89c0cf7))
+- **git:** don't ignore what is already ignored ([#20](https://github.com/sunchayn/agenteq/issues/20)) ([a05bf2f](https://github.com/sunchayn/agenteq/commit/a05bf2f8078d5558aec939ebe831f1fef89c0cf7))
 
 ## [1.3.0](https://github.com/sunchayn/agenteq/compare/v1.2.0...v1.3.0) (2026-09-14)
 
