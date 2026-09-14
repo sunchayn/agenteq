@@ -39,6 +39,15 @@ async function ignore(options: IgnoreOptions): Promise<void> {
 
     const gitignorePath = join(cwd, ".gitignore");
 
+    const alreadyIgnored =
+        spawnSync("git", ["check-ignore", "--quiet", "--", relPath], {
+            cwd: cwd,
+        }).status === 0;
+
+    if (alreadyIgnored) {
+        return;
+    }
+
     let contents = "";
 
     try {
@@ -47,16 +56,6 @@ async function ignore(options: IgnoreOptions): Promise<void> {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
             throw error;
         }
-    }
-
-    // Exact-line match only, a broader pattern that already covers this path,
-    // such as .ai/*, will not be recognized and this line gets added anyway.
-    const alreadyCovered = contents
-        .split("\n")
-        .some((line) => line.trim() === relPath);
-
-    if (alreadyCovered) {
-        return;
     }
 
     const prefix = contents.length > 0 && !contents.endsWith("\n") ? "\n" : "";

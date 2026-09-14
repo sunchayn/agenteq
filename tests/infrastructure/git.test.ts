@@ -20,6 +20,10 @@ afterEach(async () => {
 });
 
 describe("git.ignore", () => {
+    beforeEach(() => {
+        runGit(cwd, ["init", "--quiet"]);
+    });
+
     it("creates .gitignore when it doesn't exist", async () => {
         await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
@@ -59,6 +63,15 @@ describe("git.ignore", () => {
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
 
         expect(contents).toBe("node_modules/\n.ai/agenteq.json  \n");
+    });
+
+    it("does not add a line when a parent folder is already ignored", async () => {
+        await writeFile(join(cwd, ".gitignore"), ".ai/\n", "utf8");
+
+        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
+        const contents = await readFile(join(cwd, ".gitignore"), "utf8");
+
+        expect(contents).toBe(".ai/\n");
     });
 });
 
