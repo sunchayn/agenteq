@@ -103,8 +103,9 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 | `--yes`                                   | Run without prompts.<br />If `agenteq` cannot determine what to do automatically, it fails with an error instead.                                                                                                              |
 | `--json`                                  | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
 | `--source-dir <dir>`                      | The canonical source folder. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                             |
+| `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
 
-Each flag above also has an environment variable equivalent, useful for setting it once in CI. They are `AGENTEQ_AGENTS`, `AGENTEQ_ONLY`, `AGENTEQ_YES`, `AGENTEQ_JSON`, and `AGENTEQ_SOURCE_DIR`. A CLI flag always overrides its matching environment variable.
+Each flag above also has an environment variable equivalent, useful for setting it once in CI. They are `AGENTEQ_AGENTS`, `AGENTEQ_ONLY`, `AGENTEQ_YES`, `AGENTEQ_JSON`, `AGENTEQ_SOURCE_DIR`, and `AGENTEQ_SKIP_IN_CI`. A CLI flag always overrides its matching environment variable.
 
 The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer and per machine, not shared through git. The first time `agenteq` generates it, it also adds the path to `.gitignore`.
 

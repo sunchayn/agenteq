@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { isCI } from "@clack/prompts";
 import output from "@infrastructure/terminal/output.js";
 import resolveSavedAgentsAction from "@agents/actions/resolve-saved-agents-action.js";
 import saveAgentsFileAction from "@agents/actions/save-agents-file-action.js";
@@ -45,8 +46,22 @@ export function registerSyncCommand(program: Command): void {
             "--source-dir <dir>",
             `canonical source directory to sync from (env: AGENTEQ_SOURCE_DIR, default: ${artifactsManager.DEFAULT_SOURCE_DIR})`,
         )
+        .option(
+            "--skip-in-ci",
+            "do nothing when run in a CI environment (env: AGENTEQ_SKIP_IN_CI)",
+        )
         .action(async (rawOptions: RawSyncOptions) => {
             const options = resolveCommonSyncOptions(rawOptions);
+
+            if (options.shouldSkipInCi && isCI()) {
+                printMessage({
+                    isJson: options.isJson,
+                    level: "info",
+                    message: "Running in CI. Skipping `agenteq sync`.",
+                });
+
+                return;
+            }
 
             const context = {
                 cwd: process.cwd(),

@@ -51,4 +51,5 @@ export interface RawSyncOptions {
     yes?: boolean;
     json?: boolean;
     sourceDir?: string;
+    skipInCi?: boolean;
 }

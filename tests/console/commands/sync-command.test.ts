@@ -33,6 +33,17 @@ vi.mock("@infrastructure/terminal/input.js", () => ({
     },
 }));
 
+const { isCIMock } = vi.hoisted(() => ({ isCIMock: vi.fn() }));
+
+vi.mock("@clack/prompts", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@clack/prompts")>();
+
+    return {
+        ...actual,
+        isCI: isCIMock,
+    };
+});
+
 const { registerSyncCommand } = await import("@console/commands/sync.js");
 
 let originalCwd: string;
@@ -50,6 +61,8 @@ beforeEach(async () => {
     context = { cwd: cwd, sourceDir: ".ai" };
     detectAgentsMock.mockReset();
     multiselectMock.mockReset();
+    isCIMock.mockReset();
+    isCIMock.mockReturnValue(false);
     process.exitCode = 0;
 });
 
@@ -274,5 +287,56 @@ describe("agenteq sync: auto-detection", () => {
         syncSpy.mockRestore();
 
         expect(process.exitCode).toBe(1);
+    });
+});
+
+describe("agenteq sync: --skip-in-ci", () => {
+    it("does nothing when run in CI with --skip-in-ci", async () => {
+        isCIMock.mockReturnValue(true);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--yes",
+            "--json",
+            "--skip-in-ci",
+        ]);
+
+        expect(detectAgentsMock).not.toHaveBeenCalled();
+        expect(process.exitCode).toBeFalsy();
+    });
+
+    it("syncs normally in CI without --skip-in-ci", async () => {
+        isCIMock.mockReturnValue(true);
+        detectAgentsMock.mockResolvedValue(detected([claudeCode, true]));
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--yes",
+            "--json",
+        ]);
+
+        expect(await readAgentsFile(context)).toEqual(["claude_code"]);
+        expect(process.exitCode).toBeFalsy();
+    });
+
+    it("syncs normally outside CI with --skip-in-ci", async () => {
+        isCIMock.mockReturnValue(false);
+        detectAgentsMock.mockResolvedValue(detected([claudeCode, true]));
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--yes",
+            "--json",
+            "--skip-in-ci",
+        ]);
+
+        expect(await readAgentsFile(context)).toEqual(["claude_code"]);
+        expect(process.exitCode).toBeFalsy();
     });
 });

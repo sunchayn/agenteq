@@ -14,7 +14,7 @@ description: Wires agenteq onto a Laravel project that already runs Laravel Boos
 - `.ai/skills/`, `.ai/guidelines/`, and `.ai/rules` left exactly as Boost put them. These are Boost's own canonical directories. They are not agenteq's. agenteq detects `boost.json`'s `skills` field on its own and drops the `skills` capability from its sync for this project. Skills stay entirely under Boost's own management.
 - An `agenteq.json` file recording the chosen agents and capabilities. The capabilities are `mcp`, `commands`, and `guidelines`. They do not include `skills`.
 - Every generated per-agent file git ignored. This includes Boost's own per-agent files, wherever they were not already git ignored.
-- Boost's own composer `post-install-cmd`/`post-update-cmd` wiring extended to run `npx agenteq sync --yes` right after Boost's own command, when that wiring already exists.
+- Boost's own composer `post-install-cmd`/`post-update-cmd` wiring extended to run `npx agenteq sync --yes --skip-in-ci` right after Boost's own command, when that wiring already exists.
 - Any existing git hook that already calls Boost, extended the same way.
 
 ## 2. Confirm this is a Boost project
@@ -149,8 +149,8 @@ Read `composer.json`'s `scripts.post-install-cmd` and `scripts.post-update-cmd`.
 
 Search all of these, direct and resolved, for a call to `artisan boost:install` or `artisan boost:update`. Allow for a Sail-style `vendor/bin/sail artisan` wrapper, matching whatever form step 6 already found.
 
-- Found inside `composer.json` itself: insert `"npx agenteq sync --yes"` as a new entry, immediately after the Boost call, in whichever array actually contains it, the top-level hook or a resolved nested script. Composer already runs array entries in order, so this alone gives the required sequence, Boost first, then agenteq. Do not combine the two into one `&&` line.
-- Found inside an external script file: add `npx agenteq sync --yes` as its own line in that file, right after the Boost call. Match the file's own language and existing style, a bare shell line in a bash script, the same function a PHP script already uses elsewhere to run a shell command, for example `shell_exec`, `passthru`, or `exec`. Do not invent a new invocation style the file does not already use.
+- Found inside `composer.json` itself: insert `"npx agenteq sync --yes --skip-in-ci"` as a new entry, immediately after the Boost call, in whichever array actually contains it, the top-level hook or a resolved nested script. Composer already runs array entries in order, so this alone gives the required sequence, Boost first, then agenteq. Do not combine the two into one `&&` line.
+- Found inside an external script file: add `npx agenteq sync --yes --skip-in-ci` as its own line in that file, right after the Boost call. Match the file's own language and existing style, a bare shell line in a bash script, the same function a PHP script already uses elsewhere to run a shell command, for example `shell_exec`, `passthru`, or `exec`. Do not invent a new invocation style the file does not already use.
 - Found nowhere, neither `post-install-cmd` nor `post-update-cmd` calls Boost directly, through a composer script, or through an external file: nothing to extend. Boost's own docs never wire this up automatically, so tell the user nothing was found, and ask whether to add it from nothing. Add it only if they agree, to whichever key they choose, `post-update-cmd` is the more common choice, since `boost:update` itself is most often placed there.
 
 Confirm the change with the user before writing to `composer.json` or an external script file.
