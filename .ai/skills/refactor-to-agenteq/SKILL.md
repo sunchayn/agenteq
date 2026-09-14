@@ -138,7 +138,7 @@ Treat this table as the mapping agenteq ships today. If `npx agenteq detect --js
 
 | Agent (`name`) | Guidelines | Skills dir | Commands dir | MCP config (format) | MCP key path | Native stdio fields | Native remote fields |
 |---|---|---|---|---|---|---|---|
-| `claude_code` | `CLAUDE.md` | `.claude/skills` | `.claude/commands` | `.mcp.json` (JSON) | `mcpServers` | `command, args, env, cwd` | `type, url, headers` |
+| `claude_code` | `CLAUDE.md` | `.claude/skills` | `.claude/commands` | `.mcp.json` (JSON) | `mcpServers` | `type:"stdio", command, args, env, cwd` | `type, url, headers` |
 | `cursor` | `AGENTS.md` | `.cursor/skills` | `.cursor/commands` | `.cursor/mcp.json` (JSON) | `mcpServers` | `type:"stdio", command, args, env, cwd` | `url, headers` (no type) |
 | `windsurf` | `.windsurfrules` | - | `.windsurf/workflows` | - | - | - | - |
 | `devin` | `AGENTS.md` | `.devin/skills` | - | `.devin/mcp_config.json` (JSON) | `mcpServers` | `command, args, env, cwd` | `transport, url, headers` |

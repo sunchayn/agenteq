@@ -21,11 +21,11 @@ One file under `src/modules/agents/definitions/`, exporting a single `new Agent(
 
 No other source file should need to change. If adding an agent requires touching a sync stage, that's a sign a capability abstraction is leaking agent-specific logic. Reconsider the capability configuration instead of special-casing the new agent inside a stage.
 
-One file outside the source tree still needs updating: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md)'s reference table hardcodes every agent's native guidelines path, skills/commands directory, command file extension, and MCP config path, key path, and entry shape. That skill runs in a different repo with no access to this codebase, so it cannot read `definitions/{name}.ts` directly. Adding a new agent, or changing any of those fields on an existing one, needs the matching row added or updated in that table.
+Two files outside the source tree still need updating: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md) and [add-agenteq-to-boost-project](../add-agenteq-to-boost-project/SKILL.md) each carry an identical reference table hardcoding every agent's native guidelines path, skills/commands directory, command file extension, and MCP config path, key path, and entry shape. Those skills run in a different repo with no access to this codebase, so neither can read `definitions/{name}.ts` directly. Adding a new agent, or changing any of those fields on an existing one, needs the matching row added or updated in both tables.
 
 ## 3. Related Skills
 
 - **General TypeScript conventions**: [write-typescript-code](../write-typescript-code/SKILL.md)
 - **Adding a sync capability**: [add-capability-stage](../add-capability-stage/SKILL.md)
 - **Verifying the new definition's output**: [e2e-test-agents](../e2e-test-agents/SKILL.md)
-- **Keeping the reverse-engineering table current**: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md)
+- **Keeping the reverse-engineering tables current**: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md), [add-agenteq-to-boost-project](../add-agenteq-to-boost-project/SKILL.md)
