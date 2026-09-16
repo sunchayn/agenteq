@@ -1,7 +1,5 @@
 # agenteq
 
-![agenteq-gh-cover.png](art/agenteq-gh-cover.png)
-
 [![npm](https://img.shields.io/npm/v/agenteq?style=flat-square)](https://www.npmjs.com/package/agenteq)
 [![CI](https://img.shields.io/github/actions/workflow/status/sunchayn/agenteq/ci.yml?style=flat-square)](https://github.com/sunchayn/agenteq/actions)
 [![Node.js](https://img.shields.io/badge/Node.js->=20-3c873a?style=flat-square)](https://nodejs.org)
@@ -12,7 +10,7 @@
 Agenteq reads guidelines, MCP servers, skills, and commands from one canonical source directory, detects installed agents, and generate each relevant artifact in the path/format the agent expects.
 It lets you configure everything once, regardless of which agents your collaborators use, and keeps the generated files out of the repo.
 
-![agenteq.png](art/agenteq.png)
+![agenteq-gh-hero.png](art/agenteq-gh-hero.png)
 
 [Getting started](#getting-started) • [Migrating an existing repo](#migrating-an-existing-repo) • [Combining a remote source](#combining-a-remote-source) • [Using it with Laravel Boost](#using-it-with-laravel-boost) • [MCP config](#mcp-config) • [Supported agents](#supported-agents)
 
@@ -28,7 +26,7 @@ Add this layout to your repository:
 ```
 
 > [!NOTE]
-> The `.ai/GUIDELINES.md` holds the rules you want every agent to follow. `agenteq` writes a copy for each agent, in that agent's own format and location, for example `AGENTS.md` or `CLAUDE.md`.
+> The `.ai/GUIDELINES.md` holds the rules you want every agent to follow. Agenteq writes a copy for each agent, in that agent's own format and location, for example `AGENTS.md`.
 
 Once the files are in place, run this.
 
@@ -45,7 +43,7 @@ See [`examples/basic`](/examples/basic) for a basic configuration example.
 
 ## Migrating an existing repo
 
-If your repo already has scattered per-agent config, a `CLAUDE.md`, a `.cursor/` folder, an `AGENTS.md`, etc. you don't need to copy that content into `.ai/` by hand. Agenteq ships a skill for that. It will reconcile the scattered files into one source of truth and untrack everything that is not needed anymore.
+If your repo already has scattered per-agent rules, you don't need to copy that content into `.ai/` by hand. Agenteq ships a skill for that. It will reconcile the scattered files into one source of truth and untrack everything that is not needed anymore.
 
 Install it as a coding agent skill:
 
@@ -55,11 +53,11 @@ npx skills add https://github.com/sunchayn/agenteq --skill refactor-to-agenteq
 
 Then invoke it via `/refactor-to-agenteq`.
 
-See [`examples/refactor-demo`](/examples/refactor-demo) for a repo with `.claude/` and `.cursor/` fully tracked and no `.ai/` yet, to try the skill against.
+See [`examples/refactor-demo`](/examples/refactor-demo) for an example.
 
 ## Usage
 
-`agenteq` syncs four capabilities. These are guidelines, MCP servers, skills, and commands.
+Agenteq syncs four capabilities. These are guidelines, MCP servers, skills, and commands.
 
 The following commands are available.
 
@@ -69,7 +67,7 @@ npx agenteq init
 npx agenteq sync
 ```
 
-### `agenteq detect`
+### agenteq detect
 
 Shows which agents are installed on this system or in this project right now, and which capabilities each one supports.
 
@@ -77,22 +75,26 @@ Shows which agents are installed on this system or in this project right now, an
 | -------- | --------------------------------------------------------------------- |
 | `--json` | Print the result as JSON instead of a table, so a script can read it. |
 
-### `agenteq init`
+### agenteq init
 
 Lets you pick which agents to use, saves that choice, and generates the artifacts for the first time. Agents already detected as installed are pre-checked in the picker, but you can add or remove any of them.
 
+![agenteq-init.png](art/agenteq-init.png)
+
 Run `init` again to change your selection.
 
-### `agenteq sync`
+### agenteq sync
 
 Generate the artifacts for the agents you already configured.
 
 The first time you run it, with nothing configured, it behaves like `agenteq init`. After that, it picks agents in this order:
 
 1. If you pass `--agents`, sync uses exactly those agents, and saves that choice for next time, the same as `init` would.
-2. Otherwise, if you already ran `init` or `sync` before, `sync` reuses the agent list you chose last time. It does not re-scan your system or ask you anything.
+2. Otherwise, if you already ran `init` or `sync` before, it will reuse the agent list you chose last time. It does not re-scan your system or ask you anything.
 3. Otherwise, `sync` scans your system and project for installed agents. If it finds any, it saves that list for next time and uses it.
 4. Otherwise, `sync` found nothing and there is no saved list yet, so it falls back to the `init` flow.
+
+![agenteq-sync.png](art/agenteq-sync.png)
 
 > [!TIP]
 > You can add `agenteq sync` to a git hook, running it whenever changes to the canonical source directory (`.ai` by default) are detected.
@@ -103,14 +105,22 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--agents <a,b>`                          | Skip the picker and use exactly these agents, for example `--agents claude_code,cursor`.<br />Run `agenteq detect` for the exact agent names. Passing it to either `init` or `sync` saves this list as your new configuration. |
 | `--only <mcp,commands,skills,guidelines>` | Sync only some of the four capabilities instead of all of them, for example `--only guidelines,skills`.                                                                                                                        |
-| `--yes`                                   | Run without prompts.<br />If `agenteq` cannot determine what to do automatically, it fails with an error instead.                                                                                                              |
+| `--yes`                                   | Run without prompts.<br />If Agenteq cannot determine what to do automatically, it fails with an error instead.                                                                                                              |
 | `--json`                                  | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
 | `--source-dir <dir>`                      | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
 | `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
 
-Each flag above also has an environment variable equivalent, useful for setting it once in CI. They are `AGENTEQ_AGENTS`, `AGENTEQ_ONLY`, `AGENTEQ_YES`, `AGENTEQ_JSON`, `AGENTEQ_SOURCE_DIR`, and `AGENTEQ_SKIP_IN_CI`. A CLI flag always overrides its matching environment variable.
+Each flag above also has an environment variable equivalent, it might be useful for setting it once in CI:
+- AGENTEQ_AGENTS
+- AGENTEQ_ONLY
+- AGENTEQ_YES
+- AGENTEQ_JSON
+- AGENTEQ_SOURCE_DIR
+- AGENTEQ_SKIP_IN_CI
 
-The saved choice is stored at `<source-dir>/agenteq.json`, which also tracks which mcp server keys `sync` last installed into each agent's config file, so a server dropped from the canonical source gets removed from that file too on the next sync. It is per developer and per machine, not shared through git. The first time `agenteq` generates it, it also adds the path to `.gitignore`.
+A CLI flag always overrides its matching environment variable.
+
+The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer and per machine, not shared through git. The first time Agenteq generates it, it also adds the path to `.gitignore`.
 
 > [!TIP]
 > In CI, if no agents are configured, no file is saved, and `--agents` is not set, `sync` fails immediately with an error instead. Passing `--agents`, or setting `AGENTEQ_AGENTS`, avoids this.<br />CI is detected automatically, and you can also force this same non-interactive behavior with `--yes` or `--json`.
@@ -174,9 +184,9 @@ npx agenteq remote-source remove <name>           # deattach it from Agenteq
 > [!NOTE]
 > `update-choices` always needs an interactive terminal for its picker.
 
-### Consolidating scattered repos into one remote source
+### Consolidating drifted repos into one remote source
 
-If you already have several repos, each with their own scattered per-agent config, and you'd rather share one canonical set of guidelines, skills, commands, and MCP servers between them, you don't need to reconcile each one by hand or build the remote source from scratch. Agenteq ships a skill for that. It generalizes what can be shared, leaves what can't, consolidates everything into one destination repo, and wires every source repo to it as a remote source.
+If you already have several repos, each with their own scattered per-agent rules, and you'd rather share one canonical set of guidelines, skills, commands, and MCP servers between them, you don't need to reconcile each one by hand or build the remote source from scratch. Agenteq ships a skill for that. It generalizes what can be shared, leaves what can't, consolidates everything into one destination repo, and wires every source repo to it as a remote source.
 
 Install it as a coding agent skill:
 
@@ -188,7 +198,7 @@ Then invoke it via `/consolidate-repos-to-agenteq`.
 
 ## Using it with Laravel Boost
 
-At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and `agenteq` are doing the same thing. However, they are slightly different and can be combined.
+At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and Agenteq are doing the same thing. However, they are slightly different and can be combined.
 
 - **Laravel Boost** inspects the packages you actually have installed and generates guidelines and skills content from that. It writes this content into each real agent it is configured for, for example `CLAUDE.md` and `.claude/skills` for Claude Code, and it exposes its own MCP server, `boost:mcp`.
 - **Agenteq** takes your own canonical guidelines, commands, skills, and MCP servers, and distributes them into every agent you support.
@@ -319,7 +329,7 @@ Not every agent supports every capability. The table below shows what agenteq ca
 | [Windsurf](https://windsurf.com)                                                      | Yes        | No     | Yes      | No          |
 | [Zed](https://zed.dev)                                                                | Yes        | Yes    | No       | Yes         |
 
-A "No" here reflects that agent's own conventions, not a limitation of `agenteq`. For example, Pi has no MCP support of its own, so `agenteq` has nothing to write there.
+A "No" here reflects that agent's own conventions, not a limitation of Agenteq. For example, Pi has no MCP support of its own, so Agenteq has nothing to write there.
 
 Detection methods vary by agent. Some rely on a CLI command, others on a project marker files or an install-folder pattern instead. Run `agenteq detect` on your machine to see what is actually installed.
 
