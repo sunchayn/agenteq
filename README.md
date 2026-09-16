@@ -174,6 +174,18 @@ npx agenteq remote-source remove <name>           # deattach it from Agenteq
 > [!NOTE]
 > `update-choices` always needs an interactive terminal for its picker.
 
+### Consolidating scattered repos into one remote source
+
+If you already have several repos, each with their own scattered per-agent config, and you'd rather share one canonical set of guidelines, skills, commands, and MCP servers between them, you don't need to reconcile each one by hand or build the remote source from scratch. Agenteq ships a skill for that. It generalizes what can be shared, leaves what can't, consolidates everything into one destination repo, and wires every source repo to it as a remote source.
+
+Install it as a coding agent skill:
+
+```bash
+npx skills add https://github.com/sunchayn/agenteq --skill consolidate-repos-to-agenteq
+```
+
+Then invoke it via `/consolidate-repos-to-agenteq`.
+
 ## Using it with Laravel Boost
 
 At first glance, you might think that [Laravel Boost](https://github.com/laravel/boost) and `agenteq` are doing the same thing. However, they are slightly different and can be combined.
