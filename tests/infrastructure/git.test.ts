@@ -22,7 +22,11 @@ async function commitFile(
 }
 
 function runGit(cwd: string, args: string[]): void {
-    spawnSync("git", args, { cwd: cwd });
+    const result = spawnSync("git", args, { cwd: cwd, encoding: "utf8" });
+
+    if (result.status !== 0) {
+        throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+    }
 }
 
 let cwd: string;
@@ -199,6 +203,8 @@ describe("git.clone / git.pull / git.remoteUrl", () => {
 
     it("reports failure without throwing when the clone has diverged", async () => {
         await git.clone({ targetDir: targetDir, url: originDir });
+        runGit(targetDir, ["config", "user.email", "test@example.com"]);
+        runGit(targetDir, ["config", "user.name", "Test"]);
         await commitFile(targetDir, "local-only.md", "local");
         await commitFile(originDir, "second.md", "world");
 
