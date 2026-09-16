@@ -3,7 +3,7 @@ import filesystem from "@infrastructure/filesystem.js";
 import git from "@infrastructure/git.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
-import { GUIDELINES_SUFFIX } from "@artifacts/services/artifacts-manager/stubs/guidelines-suffix.js";
+import { guidelinesSuffix } from "@artifacts/services/artifacts-manager/stubs/guidelines-suffix.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 
@@ -28,6 +28,8 @@ export default async function syncGuidelinesStage(
 
 interface WriteGuidelinesOptions {
     sourcePath: string;
+    remoteSourcePaths: string[];
+    remoteUrls: string[];
     guidelinesPath: string;
     targetCwd: string;
     boostGuidelines?: string;
@@ -56,8 +58,22 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
 
     const hasSource = await filesystem.exists(source);
 
+    const remotesWithGuidelines = payload.remoteSources.filter(
+        (remote) => remote.selection.guidelines,
+    );
+
+    const remoteSourcePaths = remotesWithGuidelines.map((remote) =>
+        join(remote.rootDir, "GUIDELINES.md"),
+    );
+
+    const remoteUrls = remotesWithGuidelines.map((remote) => remote.url);
+
     // A Boost-sourced block still needs distributing even with no hand-authored GUIDELINES.md yet.
-    if (!hasSource && !payload.boostGuidelines) {
+    if (
+        !hasSource &&
+        !payload.boostGuidelines &&
+        remoteSourcePaths.length === 0
+    ) {
         return { artifactPaths: [], rows: [] };
     }
 
@@ -79,6 +95,8 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         const { detail, status } = await writeGuidelines({
             boostGuidelines: payload.boostGuidelines,
             guidelinesPath: agent.guidelinesPath,
+            remoteSourcePaths: remoteSourcePaths,
+            remoteUrls: remoteUrls,
             sourcePath: source,
             targetCwd: payload.context.cwd,
         });
@@ -111,18 +129,36 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
 async function writeGuidelines(
     options: WriteGuidelinesOptions,
 ): Promise<WriteGuidelinesResult> {
-    const { boostGuidelines, guidelinesPath, sourcePath, targetCwd } = options;
+    const {
+        boostGuidelines,
+        guidelinesPath,
+        remoteSourcePaths,
+        remoteUrls,
+        sourcePath,
+        targetCwd,
+    } = options;
 
     const target = join(targetCwd, guidelinesPath);
 
     try {
         const raw = (await filesystem.readFile(sourcePath)) ?? "";
 
+        const remoteBlocks = await Promise.all(
+            remoteSourcePaths.map(
+                async (path) => (await filesystem.readFile(path)) ?? "",
+            ),
+        );
+
+        const remoteBlock = remoteBlocks
+            .filter((block) => block.length > 0)
+            .map((block) => `${block}\n\n`)
+            .join("");
+
         const boostBlock = boostGuidelines
             ? `\n\n<laravel-boost-guidelines>\n${boostGuidelines}\n\n</laravel-boost-guidelines>\n`
             : "";
 
-        const content = `${raw}${boostBlock}${GUIDELINES_SUFFIX}`;
+        const content = `${remoteBlock}${raw}${boostBlock}${guidelinesSuffix({ remoteUrls: remoteUrls })}`;
 
         await filesystem.mkdir(dirname(target));
 

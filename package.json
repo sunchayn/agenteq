@@ -21,7 +21,7 @@
     ],
     "license": "MIT",
     "type": "module",
-    "homepage": "https://github.com/sunchayn/agenteq#readme",
+    "homepage": "https://github.com/sunchayn/agenteq",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/sunchayn/agenteq.git"

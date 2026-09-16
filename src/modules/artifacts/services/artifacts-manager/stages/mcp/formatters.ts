@@ -6,27 +6,27 @@ import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 
 /**
- * Merges an entry into a JSON file.
+ * Reconciles a JSON file's servers map against the canonical set.
  */
 export const jsonFormatter: McpFormatter = {
     format: ConfigFileFormat.Json,
-    apply: applyJson,
+    reconcile: (options) => reconcileText(options, JSON.parse, toJsonText),
 };
 
 /**
- * Merges an entry into a TOML file.
+ * Reconciles a TOML file's servers map against the canonical set.
  */
 export const tomlFormatter: McpFormatter = {
     format: ConfigFileFormat.Toml,
-    apply: applyToml,
+    reconcile: (options) => reconcileText(options, parseToml, stringifyToml),
 };
 
 /**
- * Merges an entry into a YAML file.
+ * Reconciles a YAML file's servers map against the canonical set.
  */
 export const yamlFormatter: McpFormatter = {
     format: ConfigFileFormat.Yaml,
-    apply: applyYaml,
+    reconcile: (options) => reconcileText(options, parseYaml, stringifyYaml),
 };
 
 /*
@@ -35,72 +35,50 @@ export const yamlFormatter: McpFormatter = {
 
 export interface McpFormatter {
     readonly format: ConfigFileFormat;
-    apply(options: ApplyFormatOptions): FormatInstallResult;
+    reconcile(options: ReconcileFormatOptions): FormatReconcileResult;
 }
 
-export interface FormatInstallResult {
-    status: SyncStatus.Skipped | SyncStatus.Written;
-    text: string;
-}
-
-interface ApplyFormatOptions {
+export interface ReconcileFormatOptions {
     text: string;
     keyPath: string[];
-    config: McpServer;
+    servers: McpServer[];
     mapper: McpServerMapper;
+}
+
+export interface FormatReconcileResult {
+    text: string;
+    /**
+     * One status per key that changed at the servers map.
+     * Written or skipped for a canonical server, removed for a key that was there,
+     * but is no longer part of the canonical set.
+     */
+    statusesByKey: Map<string, SyncStatus>;
 }
 
 /*
  * Internal.
  */
 
-function applyJson(options: ApplyFormatOptions): FormatInstallResult {
-    return mergeIntoText(options, JSON.parse, toJsonText);
-}
-
-function applyToml(options: ApplyFormatOptions): FormatInstallResult {
-    return mergeIntoText(options, parseToml, stringifyToml);
-}
-
-function applyYaml(options: ApplyFormatOptions): FormatInstallResult {
-    return mergeIntoText(options, parseYaml, stringifyYaml);
-}
-
 function toJsonText(doc: Record<string, unknown>): string {
     return `${JSON.stringify(doc, null, 2)}\n`;
 }
 
 /**
- * Parses a config file's text, merges the mapped entry into it, then stringifies the result back to text.
+ * Parses a config file's text, then replaces the object at the key path with exactly the canonical servers,
+ * mapped to this agent's shape, then stringifies the result back to text.
+ * Every key at that path not in the canonical set is dropped, agenteq owns that whole map.
+ * Sibling keys outside the key path, such as an agent's other settings, are left untouched.
  */
-function mergeIntoText(
-    options: ApplyFormatOptions,
+function reconcileText(
+    options: ReconcileFormatOptions,
     parse: (text: string) => unknown,
     stringify: (doc: Record<string, unknown>) => string,
-): FormatInstallResult {
-    const { config, keyPath, mapper, text } = options;
+): FormatReconcileResult {
+    const { keyPath, mapper, servers, text } = options;
 
     const parsed = text ? parse(text) : {};
     const doc = (parsed as Record<string, unknown> | null) ?? {};
-    const status = mergeServerEntry(doc, keyPath, config, mapper);
 
-    if (status === SyncStatus.Skipped) {
-        return { status: SyncStatus.Skipped, text: text };
-    }
-
-    return { status: SyncStatus.Written, text: stringify(doc) };
-}
-
-/**
- * Merges one server's mapped entry into a parsed config document at the given key path,
- * creating intermediate objects as needed, unless an entry already exists there.
- */
-function mergeServerEntry(
-    doc: Record<string, unknown>,
-    keyPath: string[],
-    config: McpServer,
-    mapper: McpServerMapper,
-): SyncStatus.Skipped | SyncStatus.Written {
     let target = doc;
 
     for (const key of keyPath) {
@@ -110,7 +88,9 @@ function mergeServerEntry(
             existing !== undefined &&
             (existing === null || typeof existing !== "object")
         ) {
-            return SyncStatus.Skipped;
+            // The path is blocked by a scalar value, nothing here is safe to touch,
+            // so the file is left exactly as-is.
+            return { statusesByKey: new Map(), text: text };
         }
 
         const next = (existing as Record<string, unknown> | undefined) ?? {};
@@ -119,13 +99,30 @@ function mergeServerEntry(
         target = next;
     }
 
-    // A value already present at this key is left untouched,
-    // so a user's own manual edit to this entry is never overwritten by a later sync.
-    if (target[config.key] !== undefined) {
-        return SyncStatus.Skipped;
+    const desiredByKey = new Map(
+        servers.map((server) => [server.key, mapper(server)] as const),
+    );
+
+    const statusesByKey = new Map<string, SyncStatus>();
+
+    for (const key of Object.keys(target)) {
+        if (desiredByKey.has(key)) {
+            continue;
+        }
+
+        Reflect.deleteProperty(target, key);
+        statusesByKey.set(key, SyncStatus.Removed);
     }
 
-    target[config.key] = mapper(config);
+    for (const [key, mapped] of desiredByKey) {
+        if (JSON.stringify(target[key]) === JSON.stringify(mapped)) {
+            statusesByKey.set(key, SyncStatus.Skipped);
+            continue;
+        }
 
-    return SyncStatus.Written;
+        target[key] = mapped;
+        statusesByKey.set(key, SyncStatus.Written);
+    }
+
+    return { statusesByKey: statusesByKey, text: stringify(doc) };
 }

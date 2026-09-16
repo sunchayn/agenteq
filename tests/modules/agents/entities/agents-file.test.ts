@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import AgentsFile from "@agents/entities/agents-file.js";
 
 describe("AgentsFile.path", () => {
-    it("joins the source dir and the agents filename", () => {
+    it("joins the canonical source directory and the agents filename", () => {
         expect(AgentsFile.path({ cwd: "/repo", sourceDir: ".ai" })).toBe(
             join("/repo", ".ai", "agenteq.json"),
         );
@@ -43,6 +43,18 @@ describe("AgentsFile.parse", () => {
         expect(
             AgentsFile.parse('{"agents":["claude_code"],"capabilities":[1]}'),
         ).toBeNull();
+    });
+});
+
+describe("AgentsFile#withAgents", () => {
+    it("replaces the agent selection", () => {
+        const file = AgentsFile.of(["claude_code"], undefined).withAgents(
+            ["cursor"],
+            ["mcp"],
+        );
+
+        expect(file.agentNames).toEqual(["cursor"]);
+        expect(file.capabilities).toEqual(["mcp"]);
     });
 });
 

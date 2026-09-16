@@ -5,8 +5,28 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import git from "@infrastructure/git.js";
 
+function initRepo(dir: string): void {
+    runGit(dir, ["init", "--quiet"]);
+    runGit(dir, ["config", "user.email", "test@example.com"]);
+    runGit(dir, ["config", "user.name", "Test"]);
+}
+
+async function commitFile(
+    dir: string,
+    name: string,
+    content: string,
+): Promise<void> {
+    await writeFile(join(dir, name), content, "utf8");
+    runGit(dir, ["add", name]);
+    runGit(dir, ["commit", "--quiet", "-m", "commit"]);
+}
+
 function runGit(cwd: string, args: string[]): void {
-    spawnSync("git", args, { cwd: cwd });
+    const result = spawnSync("git", args, { cwd: cwd, encoding: "utf8" });
+
+    if (result.status !== 0) {
+        throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+    }
 }
 
 let cwd: string;
@@ -129,5 +149,77 @@ describe("git.trackedPaths", () => {
                 relPaths: ["CLAUDE.md", "AGENTS.md"],
             }),
         ).toEqual(new Set(["CLAUDE.md"]));
+    });
+});
+
+describe("git.clone / git.pull / git.remoteUrl", () => {
+    let originDir: string;
+    let targetDir: string;
+
+    beforeEach(async () => {
+        originDir = await mkdtemp(join(tmpdir(), "agenteq-git-origin-"));
+        targetDir = join(cwd, "clone");
+        initRepo(originDir);
+        await commitFile(originDir, "GUIDELINES.md", "hello");
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("clones a repository into targetDir", async () => {
+        const result = await git.clone({
+            targetDir: targetDir,
+            url: originDir,
+        });
+
+        expect(result.isSuccessful).toBe(true);
+        expect(await readFile(join(targetDir, "GUIDELINES.md"), "utf8")).toBe(
+            "hello",
+        );
+    });
+
+    it("reports failure without throwing when the url is invalid", async () => {
+        const result = await git.clone({
+            targetDir: targetDir,
+            url: join(tmpdir(), "agenteq-does-not-exist"),
+        });
+
+        expect(result.isSuccessful).toBe(false);
+        expect(result.detail).toBeTruthy();
+    });
+
+    it("fast-forward pulls new commits from origin", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+        await commitFile(originDir, "second.md", "world");
+
+        const result = await git.pull({ cwd: targetDir });
+
+        expect(result.isSuccessful).toBe(true);
+        expect(await readFile(join(targetDir, "second.md"), "utf8")).toBe(
+            "world",
+        );
+    });
+
+    it("reports failure without throwing when the clone has diverged", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+        runGit(targetDir, ["config", "user.email", "test@example.com"]);
+        runGit(targetDir, ["config", "user.name", "Test"]);
+        await commitFile(targetDir, "local-only.md", "local");
+        await commitFile(originDir, "second.md", "world");
+
+        const result = await git.pull({ cwd: targetDir });
+
+        expect(result.isSuccessful).toBe(false);
+    });
+
+    it("reads the origin remote url of a clone", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+
+        expect(git.remoteUrl({ cwd: targetDir })).toBe(originDir);
+    });
+
+    it("returns undefined when the directory has no origin remote", () => {
+        expect(git.remoteUrl({ cwd: cwd })).toBeUndefined();
     });
 });

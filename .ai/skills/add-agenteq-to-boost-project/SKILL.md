@@ -168,11 +168,11 @@ Look for a git hook whose body calls `artisan boost:install` or `artisan boost:u
 
 ### 11.1 A Boost-aware hook exists
 
-Extend that same hook with `npx agenteq sync --yes`, placed right after the Boost call, same ordering as step 10. Do not add a second, separate hook for this.
+Extend that same hook with `npx agenteq sync --yes --skip-in-ci`, placed right after the Boost call, same ordering as step 10. Do not add a second, separate hook for this.
 
 ### 11.2 No Boost-aware hook exists
 
-There is no Boost-specific wiring to extend. Still offer a `post-checkout` hook running `npx agenteq sync --yes`. `.ai/` content changes across branches, and checking out a branch with different guidelines, commands, or MCP servers leaves every generated file stale until someone runs `agenteq sync` by hand.
+There is no Boost-specific wiring to extend. Still offer a `post-checkout` hook running `npx agenteq sync --yes --skip-in-ci`. `.ai/` content changes across branches, and checking out a branch with different guidelines, commands, or MCP servers leaves every generated file stale until someone runs `agenteq sync` by hand.
 
 Reuse whichever hook system above the project already uses for anything else, rather than adding a second manager. If the project uses none of them, ask the user which hook manager to install, or whether to skip hook setup entirely. Do not pick one on the user's behalf.
 

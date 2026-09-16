@@ -27,6 +27,7 @@ describe("printSyncOutcome: json", () => {
             .mockImplementation(() => undefined);
 
         const outcome = new SyncOutcome({
+            requestedCapabilities: Object.values(AgentCapability),
             results: [row(SyncStatus.Written)],
             sourceDir: ".ai",
         });
@@ -57,7 +58,11 @@ describe("printSyncOutcome: nothing to sync", () => {
             .mockImplementation(() => undefined);
 
         printSyncOutcome({
-            outcome: new SyncOutcome({ results: [], sourceDir: ".ai" }),
+            outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
+                results: [],
+                sourceDir: ".ai",
+            }),
         });
 
         expect(warnSpy).toHaveBeenCalledWith(
@@ -80,6 +85,7 @@ describe("printSyncOutcome: table rendering", () => {
 
         printSyncOutcome({
             outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
                 results: [row(SyncStatus.Written)],
                 sourceDir: ".ai",
             }),
@@ -105,6 +111,7 @@ describe("printSyncOutcome: gitignore alerts", () => {
 
         printSyncOutcome({
             outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
                 gitignoreAlerts: [".ai/agenteq.json"],
                 results: [row(SyncStatus.Written)],
                 sourceDir: ".ai",
@@ -114,6 +121,54 @@ describe("printSyncOutcome: gitignore alerts", () => {
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("git rm -r --cached .ai/agenteq.json"),
         );
+    });
+});
+
+describe("printSyncOutcome: remote source warnings", () => {
+    it("warns with each remote source warning before rendering the table", () => {
+        vi.spyOn(output, "table").mockImplementation(() => undefined);
+        vi.spyOn(output, "outro").mockImplementation(() => undefined);
+
+        const warnSpy = vi
+            .spyOn(output, "warn")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
+                remoteSourceWarnings: ["Could not pull the remote source"],
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            "Could not pull the remote source",
+        );
+    });
+
+    it("includes remote source warnings in the JSON payload", () => {
+        const writeSpy = vi
+            .spyOn(output, "writeRaw")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            isJson: true,
+            outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
+                remoteSourceWarnings: ["Could not pull the remote source"],
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        const payload = JSON.parse(writeSpy.mock.calls[0]?.[0] ?? "") as {
+            remoteSourceWarnings: string[];
+        };
+
+        expect(payload.remoteSourceWarnings).toEqual([
+            "Could not pull the remote source",
+        ]);
     });
 });
 
@@ -127,6 +182,7 @@ describe("printSyncOutcome: anyFailed", () => {
 
         printSyncOutcome({
             outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
                 results: [row(SyncStatus.Failed)],
                 sourceDir: ".ai",
             }),
@@ -145,6 +201,7 @@ describe("printSyncOutcome: anyFailed", () => {
 
         printSyncOutcome({
             outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
                 results: [row(SyncStatus.Failed, "Permission denied")],
                 sourceDir: ".ai",
             }),
@@ -153,5 +210,98 @@ describe("printSyncOutcome: anyFailed", () => {
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining("Permission denied"),
         );
+    });
+});
+
+describe("printSyncOutcome: skipped capabilities", () => {
+    it("notes every capability not requested this run, after the table", () => {
+        vi.spyOn(output, "table").mockImplementation(() => undefined);
+        vi.spyOn(output, "outro").mockImplementation(() => undefined);
+
+        const warnSpy = vi
+            .spyOn(output, "warn")
+            .mockImplementation(() => undefined);
+
+        const infoSpy = vi
+            .spyOn(output, "info")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            outcome: new SyncOutcome({
+                requestedCapabilities: [AgentCapability.Mcp],
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("commands, skills, guidelines"),
+        );
+
+        expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining("--only"));
+    });
+
+    it("says nothing when every capability was requested", () => {
+        vi.spyOn(output, "table").mockImplementation(() => undefined);
+        vi.spyOn(output, "outro").mockImplementation(() => undefined);
+
+        const warnSpy = vi
+            .spyOn(output, "warn")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("still notes skipped capabilities when there was nothing to sync", () => {
+        const warnSpy = vi
+            .spyOn(output, "warn")
+            .mockImplementation(() => undefined);
+
+        vi.spyOn(output, "outro").mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            outcome: new SyncOutcome({
+                requestedCapabilities: [AgentCapability.Guidelines],
+                results: [],
+                sourceDir: ".ai",
+            }),
+        });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("mcp, commands, skills"),
+        );
+    });
+
+    it("includes skippedCapabilities in the JSON payload", () => {
+        const writeSpy = vi
+            .spyOn(output, "writeRaw")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            isJson: true,
+            outcome: new SyncOutcome({
+                requestedCapabilities: [AgentCapability.Mcp],
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        const payload = JSON.parse(writeSpy.mock.calls[0]?.[0] ?? "") as {
+            skippedCapabilities: string[];
+        };
+
+        expect(payload.skippedCapabilities).toEqual([
+            "commands",
+            "skills",
+            "guidelines",
+        ]);
     });
 });
