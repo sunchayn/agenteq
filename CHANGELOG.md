@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0](https://github.com/sunchayn/agenteq/compare/v1.3.0...v1.4.0) (2026-09-16)
+
+
+### Added
+
+* **artifacts:** support remote repos as a source ([#22](https://github.com/sunchayn/agenteq/issues/22)) ([a0ad78a](https://github.com/sunchayn/agenteq/commit/a0ad78a2b6b30d8c577af0b401458f938c97d77f))
+
+
+### Fixed
+
+* **git:** don't ignore what is already ignored ([#20](https://github.com/sunchayn/agenteq/issues/20)) ([a05bf2f](https://github.com/sunchayn/agenteq/commit/a05bf2f8078d5558aec939ebe831f1fef89c0cf7))
+
 ## [1.3.0](https://github.com/sunchayn/agenteq/compare/v1.2.0...v1.3.0) (2026-09-14)
 
 ### Added
