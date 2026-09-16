@@ -105,12 +105,13 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--agents <a,b>`                          | Skip the picker and use exactly these agents, for example `--agents claude_code,cursor`.<br />Run `agenteq detect` for the exact agent names. Passing it to either `init` or `sync` saves this list as your new configuration. |
 | `--only <mcp,commands,skills,guidelines>` | Sync only some of the four capabilities instead of all of them, for example `--only guidelines,skills`.                                                                                                                        |
-| `--yes`                                   | Run without prompts.<br />If Agenteq cannot determine what to do automatically, it fails with an error instead.                                                                                                              |
+| `--yes`                                   | Run without prompts.<br />If Agenteq cannot determine what to do automatically, it fails with an error instead.                                                                                                                |
 | `--json`                                  | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
 | `--source-dir <dir>`                      | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
 | `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
 
 Each flag above also has an environment variable equivalent, it might be useful for setting it once in CI:
+
 - AGENTEQ_AGENTS
 - AGENTEQ_ONLY
 - AGENTEQ_YES
