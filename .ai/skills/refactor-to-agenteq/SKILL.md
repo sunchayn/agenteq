@@ -113,14 +113,14 @@ No warning means nothing to untrack.
 
 ## 8. Set up a hook to keep sync current
 
-`.ai/` content changes across branches. Checking out a branch with different guidelines, skills, commands, or MCP servers leaves every generated file stale, until someone runs `agenteq sync` by hand. A `post-checkout` git hook running `npx agenteq sync --yes` closes that gap.
+`.ai/` content changes across branches. Checking out a branch with different guidelines, skills, commands, or MCP servers leaves every generated file stale, until someone runs `agenteq sync` by hand. A `post-checkout` git hook running `npx agenteq sync --yes --skip-in-ci` closes that gap.
 
 Reuse whatever hook system the repo already has. Never add a second one.
 
-- Husky (a `.husky/` directory, or a `"prepare": "husky"` script in `package.json`): add or extend `.husky/post-checkout` with `npx agenteq sync --yes`.
-- lefthook (`lefthook.yml` or `lefthook.yaml`): add a `post-checkout` entry under `commands`, running `npx agenteq sync --yes`.
-- simple-git-hooks (a `"simple-git-hooks"` field in `package.json`): add `"post-checkout": "npx agenteq sync --yes"`. Tell the user to run `npx simple-git-hooks` once, to install it.
-- pre-commit framework (`.pre-commit-config.yaml`): add a local hook with `stages: [post-checkout]`, running `npx agenteq sync --yes`.
+- Husky (a `.husky/` directory, or a `"prepare": "husky"` script in `package.json`): add or extend `.husky/post-checkout` with `npx agenteq sync --yes --skip-in-ci`.
+- lefthook (`lefthook.yml` or `lefthook.yaml`): add a `post-checkout` entry under `commands`, running `npx agenteq sync --yes --skip-in-ci`.
+- simple-git-hooks (a `"simple-git-hooks"` field in `package.json`): add `"post-checkout": "npx agenteq sync --yes --skip-in-ci"`. Tell the user to run `npx simple-git-hooks` once, to install it.
+- pre-commit framework (`.pre-commit-config.yaml`): add a local hook with `stages: [post-checkout]`, running `npx agenteq sync --yes --skip-in-ci`.
 - Overcommit (`.overcommit.yml`): add a `PostCheckout` hook running the same command.
 - A plain native hook (`.git/hooks/post-checkout`): append the sync call to it. Do not overwrite what it already does.
 
