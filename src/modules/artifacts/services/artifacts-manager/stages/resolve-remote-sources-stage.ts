@@ -1,7 +1,9 @@
 import pc from "picocolors";
 import filesystem from "@infrastructure/filesystem.js";
 import git from "@infrastructure/git.js";
+import { defaultClonePathFor } from "@support/utils/agenteq-sources-root.js";
 import { formatErrorDetails } from "@support/utils/format-error-details.js";
+import loadAgentsFileAction from "@agents/actions/load-agents-file-action.js";
 import loadRemoteSourcesFileAction from "@artifacts/actions/load-remote-sources-file-action.js";
 import type { RemoteSourceEntry } from "@artifacts/entities/remote-sources-file.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
@@ -9,6 +11,7 @@ import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync
 
 /**
  * Resolves every configured remote source, in the order they were added.
+ * Each one is cloned at the path saved for this machine, or the default location when none was saved.
  * A remote that fails to clone is dropped with a warning, not resolved at all this run.
  * A remote that fails to pull still resolves, against its last-synced state.
  */
@@ -16,6 +19,10 @@ export default async function resolveRemoteSourcesStage(
     payload: SyncPayload,
 ): Promise<SyncPayload> {
     const file = await loadRemoteSourcesFileAction({
+        context: payload.context,
+    });
+
+    const agentsFile = await loadAgentsFileAction({
         context: payload.context,
     });
 
@@ -29,7 +36,14 @@ export default async function resolveRemoteSourcesStage(
             continue;
         }
 
-        const { outcome, warning } = await resolveOneRemote(name, entry);
+        const clonePath =
+            agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
+
+        const { outcome, warning } = await resolveOneRemote(
+            name,
+            entry,
+            clonePath,
+        );
 
         if (warning) {
             result = result.withRemoteSourceWarning(warning);
@@ -55,8 +69,9 @@ interface ResolveOneRemoteResult {
 async function resolveOneRemote(
     name: string,
     entry: RemoteSourceEntry,
+    clonePath: string,
 ): Promise<ResolveOneRemoteResult> {
-    const { clonePath, selection, url } = entry;
+    const { selection, url } = entry;
 
     const hasExistingClone = await filesystem.exists(clonePath);
 

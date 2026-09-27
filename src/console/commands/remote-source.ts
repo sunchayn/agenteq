@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { Command } from "commander";
 import pc from "picocolors";
 import input from "@infrastructure/terminal/input.js";
@@ -8,9 +8,11 @@ import env from "@infrastructure/env.js";
 import output from "@infrastructure/terminal/output.js";
 import { expandPath } from "@support/utils/expand-path.js";
 import { formatErrorDetails } from "@support/utils/format-error-details.js";
-import { AGENTEQ_SOURCES_ROOT } from "@support/utils/agenteq-sources-root.js";
+import { defaultClonePathFor } from "@support/utils/agenteq-sources-root.js";
 import { CliError } from "@support/errors/cli-error.js";
 import artifactsManager from "@artifacts/services/artifacts-manager/index.js";
+import loadAgentsFileAction from "@agents/actions/load-agents-file-action.js";
+import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-action.js";
 import loadRemoteSourcesFileAction from "@artifacts/actions/load-remote-sources-file-action.js";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import discoverRemoteCapabilitiesAction, {
@@ -19,6 +21,7 @@ import discoverRemoteCapabilitiesAction, {
 import RemoteSourcesFile, {
     type RemoteSourceSelection,
 } from "@artifacts/entities/remote-sources-file.js";
+import { promptForClonePath } from "@console/actions/concerns/prompt-for-clone-path.js";
 import { printMessage, renderAsJson } from "@console/utils/console.js";
 
 /**
@@ -126,12 +129,6 @@ interface ResolveOrCloneRepoOptions {
     clonePath: string;
 }
 
-interface ResolveClonePathOptions {
-    name: string;
-    explicitPath: string | undefined;
-    canInteract: boolean;
-}
-
 /*
  * Internal.
  */
@@ -151,11 +148,9 @@ async function runAdd(
 
     const canInteract = input.isInteractive() && !options.shouldSkipPrompts;
 
-    const clonePath = await resolveClonePath({
-        canInteract: canInteract,
-        explicitPath: rawOptions.path,
-        name: name,
-    });
+    const clonePath = rawOptions.path
+        ? resolve(expandPath(rawOptions.path))
+        : await promptForClonePath({ canInteract: canInteract, name: name });
 
     await resolveOrCloneRepo({ clonePath: clonePath, gitUrl: gitUrl });
 
@@ -170,9 +165,14 @@ async function runAdd(
         : selectEverything(capabilities);
 
     const updated = file.withRemote(name, {
-        clonePath: clonePath,
         selection: selection,
         url: gitUrl,
+    });
+
+    await saveRemoteClonePathAction({
+        context: context,
+        name: name,
+        path: clonePath,
     });
 
     await saveRemoteSourcesFileAction({
@@ -204,8 +204,24 @@ async function runList(rawOptions: RemoteSourceOptions): Promise<void> {
         return;
     }
 
+    const agentsFile = await loadAgentsFileAction({ context: context });
+
     if (options.isJson) {
-        output.writeRaw(renderAsJson(file.remotes));
+        output.writeRaw(
+            renderAsJson(
+                Object.fromEntries(
+                    file.names().map((name) => [
+                        name,
+                        {
+                            ...file.get(name),
+                            clonePath:
+                                agentsFile?.clonePathOf(name) ??
+                                defaultClonePathFor(name),
+                        },
+                    ]),
+                ),
+            ),
+        );
 
         return;
     }
@@ -215,7 +231,11 @@ async function runList(rawOptions: RemoteSourceOptions): Promise<void> {
         file.names().map((name) => {
             const entry = file.get(name);
 
-            return [name, entry?.url ?? "", entry?.clonePath ?? ""];
+            return [
+                name,
+                entry?.url ?? "",
+                agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name),
+            ];
         }),
     );
 }
@@ -244,16 +264,20 @@ async function runUpdateChoices(
         );
     }
 
-    await git.pull({ cwd: entry.clonePath });
+    const agentsFile = await loadAgentsFileAction({ context: context });
+
+    const clonePath =
+        agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
+
+    await git.pull({ cwd: clonePath });
 
     const capabilities = await discoverRemoteCapabilitiesAction({
-        rootDir: entry.clonePath,
+        rootDir: clonePath,
     });
 
     const selection = await promptForSelection(capabilities, entry.selection);
 
     const updated = file.withRemote(name, {
-        clonePath: entry.clonePath,
         selection: selection,
         url: entry.url,
     });
@@ -291,6 +315,11 @@ async function runRemove(
         return;
     }
 
+    const agentsFile = await loadAgentsFileAction({ context: context });
+
+    const clonePath =
+        agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
+
     const updated = file.withoutRemote(name);
     const path = RemoteSourcesFile.path(context);
 
@@ -304,10 +333,14 @@ async function runRemove(
         });
     }
 
+    if (agentsFile?.clonePathOf(name)) {
+        await saveRemoteClonePathAction({ context: context, name: name });
+    }
+
     printMessage({
         isJson: options.isJson,
         level: "info",
-        message: `Removed remote source "${pc.bold(name)}". The clone at ${pc.bold(entry.clonePath)} was left in place, delete it yourself if you no longer need it.`,
+        message: `Removed remote source "${pc.bold(name)}". The clone at ${pc.bold(clonePath)} was left in place, delete it yourself if you no longer need it.`,
     });
 }
 
@@ -325,40 +358,6 @@ function resolveOptions(
             env.readString("AGENTEQ_SOURCE_DIR") ??
             artifactsManager.DEFAULT_SOURCE_DIR,
     };
-}
-
-async function resolveClonePath(
-    options: ResolveClonePathOptions,
-): Promise<string> {
-    const { canInteract, explicitPath, name } = options;
-
-    if (explicitPath) {
-        return resolve(expandPath(explicitPath));
-    }
-
-    const suggested = defaultClonePathFor(name);
-
-    if (!canInteract) {
-        return suggested;
-    }
-
-    const answer = await input.text({
-        defaultValue: suggested,
-        message: "Where should this repository be cloned",
-        placeholder: suggested,
-    });
-
-    if (input.isCancel(answer)) {
-        throw new CliError("E_REMOTE_SOURCE_CANCELLED", "Cancelled.");
-    }
-
-    const trimmed = answer.trim();
-
-    return trimmed.length > 0 ? resolve(expandPath(trimmed)) : suggested;
-}
-
-function defaultClonePathFor(name: string): string {
-    return join(AGENTEQ_SOURCES_ROOT, name);
 }
 
 /**

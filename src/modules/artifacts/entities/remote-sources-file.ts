@@ -4,7 +4,7 @@ import type { RunContext } from "@shared/types/run-context.js";
 
 /**
  * Agenteq's own saved record of every named remote git source, keyed by the name given to it.
- * Each entry holds the url, the clone path, and the capabilities picked from it, saved at <source-dir>/remote-sources.json.
+ * Each entry holds the url and the capabilities picked from it, saved at <source-dir>/remote-sources.json.
  */
 export default class RemoteSourcesFile {
     private static readonly FILENAME = "remote-sources.json";
@@ -82,7 +82,6 @@ export default class RemoteSourcesFile {
 
 export interface RemoteSourceEntry {
     url: string;
-    clonePath: string;
     selection: RemoteSourceSelection;
 }
 
@@ -105,7 +104,6 @@ const remoteSourceSelectionSchema = z.object({
 });
 
 const remoteSourceEntrySchema = z.object({
-    clonePath: z.string(),
     selection: remoteSourceSelectionSchema,
     url: z.string(),
 });

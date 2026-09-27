@@ -14,15 +14,23 @@ export default async function saveAgentsFileAction(
 ): Promise<void> {
     const { agentNames, capabilities, context } = options;
 
-    const path = AgentsFile.path(context);
-
-    const existedBefore = await filesystem.exists(path);
     const existing = await loadAgentsFileAction({ context: context });
 
-    const updated = (existing ?? AgentsFile.empty()).withAgents(
-        agentNames,
-        capabilities,
+    await writeAgentsFile(
+        context,
+        (existing ?? AgentsFile.empty()).withAgents(agentNames, capabilities),
     );
+}
+
+/**
+ * Writes the file, and adds it to `.gitignore` the first time it is created.
+ */
+export async function writeAgentsFile(
+    context: RunContext,
+    updated: AgentsFile,
+): Promise<void> {
+    const path = AgentsFile.path(context);
+    const existedBefore = await filesystem.exists(path);
 
     await filesystem.mkdir(dirname(path));
 

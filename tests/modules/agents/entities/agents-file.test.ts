@@ -77,3 +77,43 @@ describe("AgentsFile#serialize", () => {
         );
     });
 });
+
+describe("AgentsFile remote clone paths", () => {
+    it("parses saved clone paths and defaults to none", () => {
+        expect(
+            AgentsFile.parse('{"agents":[],"remoteClonePaths":{"team":"/a"}}')
+                ?.remoteClonePaths,
+        ).toEqual({ team: "/a" });
+
+        expect(AgentsFile.parse('{"agents":[]}')?.remoteClonePaths).toEqual({});
+    });
+
+    it("serializes clone paths only when there are some", () => {
+        const empty = AgentsFile.of(["claude_code"], undefined);
+
+        expect(JSON.parse(empty.serialize())).not.toHaveProperty(
+            "remoteClonePaths",
+        );
+
+        expect(
+            JSON.parse(empty.withRemoteClonePath("team", "/a").serialize())
+                .remoteClonePaths,
+        ).toEqual({ team: "/a" });
+    });
+
+    it("keeps clone paths when the agent selection is replaced", () => {
+        const file = AgentsFile.of(["claude_code"], undefined)
+            .withRemoteClonePath("team", "/a")
+            .withAgents(["cursor"], undefined);
+
+        expect(file.clonePathOf("team")).toBe("/a");
+    });
+
+    it("forgets a clone path", () => {
+        const file = AgentsFile.empty()
+            .withRemoteClonePath("team", "/a")
+            .withoutRemoteClonePath("team");
+
+        expect(file.clonePathOf("team")).toBeUndefined();
+    });
+});

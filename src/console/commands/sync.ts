@@ -131,6 +131,7 @@ export function registerSyncCommand(program: Command): void {
                 capabilities: capabilities,
                 context: context,
                 isJson: options.isJson,
+                shouldSkipPrompts: options.shouldSkipPrompts,
                 label: "agenteq sync",
             });
 

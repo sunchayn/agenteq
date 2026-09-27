@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import resolveRemoteSourcesStage from "@artifacts/services/artifacts-manager/stages/resolve-remote-sources-stage.js";
+import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-action.js";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
@@ -79,12 +80,17 @@ describe("resolveRemoteSourcesStage", () => {
             context: context,
             remotes: {
                 team: {
-                    clonePath: clonePath,
                     selection: selection,
                     url: originDir,
                 },
             },
             shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "team",
+            path: clonePath,
         });
 
         const result = await resolveRemoteSourcesStage(payload());
@@ -123,17 +129,27 @@ describe("resolveRemoteSourcesStage", () => {
             context: context,
             remotes: {
                 first: {
-                    clonePath: join(cwd, "first-clone"),
                     selection: selection,
                     url: firstOrigin,
                 },
                 second: {
-                    clonePath: join(cwd, "second-clone"),
                     selection: selection,
                     url: secondOrigin,
                 },
             },
             shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "first",
+            path: join(cwd, "first-clone"),
+        });
+
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "second",
+            path: join(cwd, "second-clone"),
         });
 
         const result = await resolveRemoteSourcesStage(payload());
@@ -152,12 +168,17 @@ describe("resolveRemoteSourcesStage", () => {
             context: context,
             remotes: {
                 team: {
-                    clonePath: join(cwd, "clone"),
                     selection: selection,
                     url: join(tmpdir(), "agenteq-does-not-exist"),
                 },
             },
             shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "team",
+            path: join(cwd, "clone"),
         });
 
         const result = await resolveRemoteSourcesStage(payload());
@@ -182,7 +203,6 @@ describe("resolveRemoteSourcesStage", () => {
             context: context,
             remotes: {
                 team: {
-                    clonePath: clonePath,
                     selection: selection,
                     url: "https://example.invalid/team.git",
                 },
@@ -190,10 +210,47 @@ describe("resolveRemoteSourcesStage", () => {
             shouldIgnore: false,
         });
 
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "team",
+            path: clonePath,
+        });
+
         const result = await resolveRemoteSourcesStage(payload());
 
         expect(result.remoteSourceWarnings).toHaveLength(1);
         expect(result.remoteSourceWarnings[0]).toContain("Could not pull");
         expect(result.remoteSources[0]?.rootDir).toBe(clonePath);
+    });
+});
+
+describe("resolveRemoteSourcesStage clone location", () => {
+    it("uses the clone path saved for this machine over the default", async () => {
+        const originDir = await mkdtemp(
+            join(tmpdir(), "agenteq-remote-origin-"),
+        );
+
+        initOriginRepo(originDir);
+        await writeFile(join(originDir, "GUIDELINES.md"), "hello");
+        runGit(originDir, ["add", "GUIDELINES.md"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "commit"]);
+
+        await saveRemoteSourcesFileAction({
+            context: context,
+            remotes: { team: { selection: selection, url: originDir } },
+            shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "team",
+            path: join(cwd, "mine"),
+        });
+
+        const result = await resolveRemoteSourcesStage(payload());
+
+        expect(result.remoteSources[0]?.rootDir).toBe(join(cwd, "mine"));
+
+        await rm(originDir, { force: true, recursive: true });
     });
 });

@@ -3,6 +3,7 @@ import output from "@infrastructure/terminal/output.js";
 import type Agent from "@agents/entities/agent.js";
 import type { RunContext } from "@shared/types/run-context.js";
 import type { AgentCapability } from "@artifacts/enums/agent-capability.js";
+import ensureRemoteClonePathsAction from "@console/actions/ensure-remote-clone-paths-action.js";
 import { printSyncOutcome } from "@console/actions/concerns/print-sync-outcome.js";
 
 /**
@@ -12,11 +13,17 @@ import { printSyncOutcome } from "@console/actions/concerns/print-sync-outcome.j
 export default async function syncArtifactsAction(
     options: RunSyncFlowOptions,
 ): Promise<boolean> {
-    const { agents, capabilities, context, isJson, label } = options;
+    const { agents, capabilities, context, isJson, label, shouldSkipPrompts } =
+        options;
 
     if (!isJson) {
         output.intro(label);
     }
+
+    await ensureRemoteClonePathsAction({
+        context: context,
+        shouldSkipPrompts: shouldSkipPrompts,
+    });
 
     const outcome = await artifactsManager.sync({
         capabilities: capabilities,
@@ -42,4 +49,5 @@ interface RunSyncFlowOptions {
     context: RunContext;
     isJson: boolean;
     label: string;
+    shouldSkipPrompts: boolean;
 }

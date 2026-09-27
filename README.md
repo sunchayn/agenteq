@@ -176,7 +176,7 @@ npx agenteq remote-source remove <name>           # deattach it from Agenteq
 
 | Flag                 | Applies to                                | What it does                                                                                            |
 | -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--path <dir>`       | `add`                                     | Where to clone the repository, skips the location prompt.                                               |
+| `--path <dir>`       | `add`                                     | Where to clone the repository on this machine, skips the location prompt.                               |
 | `--ignored`          | `add`                                     | Keep the saved configuration out of git, personal to this machine, instead of shared with the project.  |
 | `--yes`              | `add`                                     | Run non-interactively; everything found is selected instead of opening the picker (env: `AGENTEQ_YES`). |
 | `--json`             | `add`, `list`, `update-choices`, `remove` | Print machine-readable JSON instead of text or a table (env: `AGENTEQ_JSON`).                           |
@@ -184,6 +184,8 @@ npx agenteq remote-source remove <name>           # deattach it from Agenteq
 
 > [!NOTE]
 > `update-choices` always needs an interactive terminal for its picker.
+
+The clone location is personal to each machine. It is saved in `<source-dir>/agenteq.json`, which is not shared through git, and never in `remote-sources.json`. Someone who pulls your `remote-sources.json` is asked where to clone each remote the first time they run `npx agenteq sync`. With `--yes` or in CI, the default `~/.agenteq/sources/<name>` is used.
 
 ### Consolidating drifted repos into one remote source
 

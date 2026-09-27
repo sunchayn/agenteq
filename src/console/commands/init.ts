@@ -108,6 +108,7 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
         capabilities: capabilities,
         context: context,
         isJson: options.isJson,
+        shouldSkipPrompts: options.shouldSkipPrompts,
         label: "agenteq init",
     });
 
