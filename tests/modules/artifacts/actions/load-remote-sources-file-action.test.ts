@@ -64,6 +64,6 @@ describe("loadRemoteSourcesFileAction", () => {
         const result = await loadRemoteSourcesFileAction({ context: context });
 
         expect(result.get("team")?.url).toBe("git@example.com");
-        expect(result.get("team")?.clonePath).toBe("/tmp/clone");
+        expect(result.get("team")).not.toHaveProperty("clonePath");
     });
 });

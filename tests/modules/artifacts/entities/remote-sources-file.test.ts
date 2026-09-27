@@ -10,7 +10,6 @@ const selection = {
 };
 
 const teamEntry = {
-    clonePath: "/home/user/.agenteq/sources/team",
     selection: selection,
     url: "git@github.com:org/team.git",
 };
@@ -61,7 +60,6 @@ describe("RemoteSourcesFile.parse", () => {
                 JSON.stringify({
                     remotes: {
                         team: {
-                            clonePath: "/tmp/clone",
                             selection: { commands: "not-an-array" },
                             url: "git@example.com",
                         },
@@ -111,5 +109,28 @@ describe("RemoteSourcesFile#serialize", () => {
         expect(new RemoteSourcesFile({ team: teamEntry }).serialize()).toMatch(
             /\n$/,
         );
+    });
+});
+
+describe("RemoteSourcesFile legacy clonePath", () => {
+    it("drops a clonePath saved by an older version", () => {
+        const parsed = RemoteSourcesFile.parse(
+            JSON.stringify({
+                remotes: {
+                    team: {
+                        clonePath: "/old/machine/path",
+                        selection: {
+                            commands: [],
+                            guidelines: false,
+                            mcp: [],
+                            skills: [],
+                        },
+                        url: "u",
+                    },
+                },
+            }),
+        );
+
+        expect(parsed.get("team")).not.toHaveProperty("clonePath");
     });
 });

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import git from "@infrastructure/git.js";
+import AgentsFile from "@agents/entities/agents-file.js";
 import RemoteSourcesFile from "@artifacts/entities/remote-sources-file.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
@@ -161,7 +162,13 @@ describe("agenteq remote-source add", () => {
         const entry = saved.get("team");
 
         expect(entry?.url).toBe(originDir);
-        expect(entry?.clonePath).toBe(clonePath);
+        expect(entry).not.toHaveProperty("clonePath");
+
+        const agentsFile = AgentsFile.parse(
+            await readFile(AgentsFile.path(context), "utf8"),
+        );
+
+        expect(agentsFile?.clonePathOf("team")).toBe(clonePath);
         expect(entry?.selection.guidelines).toBe(true);
 
         expect(await readFile(join(clonePath, "GUIDELINES.md"), "utf8")).toBe(
@@ -182,9 +189,9 @@ describe("agenteq remote-source add", () => {
             join(cwd, "clone"),
         ]);
 
-        await expect(
-            readFile(join(cwd, ".gitignore"), "utf8"),
-        ).rejects.toThrow();
+        const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
+
+        expect(gitignore).not.toContain("remote-sources.json");
     });
 
     it("gitignores the saved file when --ignored is passed", async () => {

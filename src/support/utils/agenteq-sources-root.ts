@@ -7,3 +7,10 @@ import { join } from "node:path";
  * or swapped for a different one, and is no longer known to the payload.
  */
 export const AGENTEQ_SOURCES_ROOT = join(homedir(), ".agenteq", "sources");
+
+/**
+ * Where a remote source is cloned on this machine when the user did not pick another location.
+ */
+export function defaultClonePathFor(name: string): string {
+    return join(AGENTEQ_SOURCES_ROOT, name);
+}

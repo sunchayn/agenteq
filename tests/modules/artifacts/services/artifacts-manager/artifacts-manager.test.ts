@@ -24,6 +24,7 @@ import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
+import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-action.js";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 
 const baseAgentOptions: AgentOptions = {
@@ -612,7 +613,6 @@ describe("syncMcpAction with a remote source", () => {
             context: { cwd: cwd, sourceDir: ".ai" },
             remotes: {
                 team: {
-                    clonePath: remoteRoot,
                     selection: {
                         commands: [],
                         guidelines: false,
@@ -623,6 +623,12 @@ describe("syncMcpAction with a remote source", () => {
                 },
             },
             shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            name: "team",
+            path: remoteRoot,
         });
 
         const outcome = await artifactsManager.sync({
@@ -651,7 +657,6 @@ describe("syncMcpAction with a remote source", () => {
             context: { cwd: cwd, sourceDir: ".ai" },
             remotes: {
                 team: {
-                    clonePath: remoteRoot,
                     selection: {
                         commands: [],
                         guidelines: false,
@@ -662,6 +667,12 @@ describe("syncMcpAction with a remote source", () => {
                 },
             },
             shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            name: "team",
+            path: remoteRoot,
         });
 
         await artifactsManager.sync({

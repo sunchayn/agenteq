@@ -5,7 +5,7 @@ import type { RunContext } from "@shared/types/run-context.js";
 
 /**
  * Reads the saved agents file and resolves its names into real Agent objects.
- * Returns undefined for a missing or malformed file, so the caller can fall through to detection.
+ * Returns undefined for a missing, malformed, or incomplete file, so the caller can fail over to detection.
  */
 export default async function resolveSavedAgentsAction(
     options: ResolveSavedAgentsOptions,
@@ -14,7 +14,7 @@ export default async function resolveSavedAgentsAction(
 
     const saved = await loadAgentsFileAction({ context: context });
 
-    if (!saved) {
+    if (!saved || saved.isCreatedByRemoteClonePathOnly()) {
         return undefined;
     }
 
