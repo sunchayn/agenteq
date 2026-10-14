@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
     mcpSchema,
     remoteConfig,
@@ -14,16 +14,19 @@ import type { McpServer } from "@agents/entities/mcp-server.js";
 import type { z } from "zod";
 
 /**
- * Globs every .ai/mcp/<name>/config.json under sourceDir, validates each, and reshapes matches into McpServer.
+ * Globs every {sourceDir}/mcp/<name>/config.json, validates each, and reshapes matches into McpServer.
+ * Pass `recursive` to also match one nested under any folder, e.g. a remote source's `backend/mcp/<name>/config.json`.
  */
 export default async function discoverMcpServersAction(
     options: DiscoverMcpServersOptions,
 ): Promise<McpServer[]> {
-    const { cwd, sourceDir = ".ai" } = options;
+    const { cwd, recursive = false, sourceDir = ".ai" } = options;
 
     const files = await filesystem.glob({
         cwd: cwd,
-        pattern: `${sourceDir}/mcp/*/config.json`,
+        pattern: recursive
+            ? "**/mcp/*/config.json"
+            : `${sourceDir}/mcp/*/config.json`,
     });
 
     const servers: McpServer[] = [];
@@ -44,6 +47,7 @@ export default async function discoverMcpServersAction(
 interface DiscoverMcpServersOptions {
     cwd: string;
     sourceDir?: string;
+    recursive?: boolean;
 }
 
 interface LoadMcpServerOptions {
@@ -71,7 +75,10 @@ async function loadMcpServer(
     const raw = parseConfigFile(relativePath, text);
     const parsed = validateMcpConfig(relativePath, raw);
 
-    return toMcpServer(parsed);
+    // The server's key is its own directory name, independent of this file's content.
+    const key = basename(dirname(relativePath));
+
+    return toMcpServer(parsed, key);
 }
 
 function parseConfigFile(relativePath: string, text: string): unknown {
@@ -111,9 +118,13 @@ function validateMcpConfig(
 }
 
 /**
- * Reshapes one validated config entry into the canonical McpServer, branching only on server kind.
+ * Reshapes one validated config entry, plus its key read from the config's own directory name,
+ * into the canonical McpServer, branching only on server kind.
  */
-function toMcpServer(parsed: z.infer<typeof mcpSchema>): McpServer {
+function toMcpServer(
+    parsed: z.infer<typeof mcpSchema>,
+    key: string,
+): McpServer {
     if (parsed.type === "stdio") {
         return new McpStdioServer({
             args: parsed.config.args,
@@ -121,14 +132,14 @@ function toMcpServer(parsed: z.infer<typeof mcpSchema>): McpServer {
             cwd: parsed.config.cwd,
             env: parsed.config.env,
             extra: extractExtra(parsed.config, STDIO_FIELDS),
-            key: parsed.key,
+            key: key,
         });
     }
 
     return new McpRemoteServer({
         extra: extractExtra(parsed.config, REMOTE_FIELDS),
         headers: parsed.config.headers,
-        key: parsed.key,
+        key: key,
         type: parsed.type,
         url: parsed.config.url,
     });

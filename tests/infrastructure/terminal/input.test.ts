@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const {
     confirmMock,
+    groupMultiselectMock,
     isCancelMock,
     isCIMock,
     isTTYMock,
@@ -9,6 +10,7 @@ const {
     textMock,
 } = vi.hoisted(() => ({
     confirmMock: vi.fn(),
+    groupMultiselectMock: vi.fn(),
     isCancelMock: vi.fn(),
     isCIMock: vi.fn(),
     isTTYMock: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock("@clack/prompts", async (importOriginal) => {
     return {
         ...actual,
         confirm: confirmMock,
+        groupMultiselect: groupMultiselectMock,
         isCancel: isCancelMock,
         isCI: isCIMock,
         isTTY: isTTYMock,
@@ -88,6 +91,57 @@ describe("input.multiselect", () => {
         ]);
 
         expect(multiselectMock).toHaveBeenCalledWith(params);
+    });
+
+    it("drops an initial value no option offers before calling clack", async () => {
+        multiselectMock.mockResolvedValue([]);
+
+        await input.multiselect({
+            initialValues: ["claude_code", "stale_agent"],
+            message: "Select agents to sync",
+            options: [{ label: "Claude Code", value: "claude_code" }],
+        });
+
+        expect(multiselectMock).toHaveBeenCalledWith(
+            expect.objectContaining({ initialValues: ["claude_code"] }),
+        );
+    });
+});
+
+describe("input.groupMultiselect", () => {
+    it("forwards params to clack and resolves with its answer", async () => {
+        groupMultiselectMock.mockResolvedValue(["backend::foo"]);
+
+        const params = {
+            initialValues: [],
+            message: "Select skills to sync from this source",
+            options: {
+                "(root)": [{ label: "foo", value: "foo" }],
+                backend: [{ label: "backend::foo", value: "backend::foo" }],
+            },
+        };
+
+        await expect(input.groupMultiselect(params)).resolves.toEqual([
+            "backend::foo",
+        ]);
+
+        expect(groupMultiselectMock).toHaveBeenCalledWith(params);
+    });
+
+    it("drops an initial value no option offers before calling clack", async () => {
+        groupMultiselectMock.mockResolvedValue([]);
+
+        await input.groupMultiselect({
+            initialValues: ["foo", "stale-server"],
+            message: "Select mcp servers to sync from this source",
+            options: {
+                "(root)": [{ label: "foo", value: "foo" }],
+            },
+        });
+
+        expect(groupMultiselectMock).toHaveBeenCalledWith(
+            expect.objectContaining({ initialValues: ["foo"] }),
+        );
     });
 });
 

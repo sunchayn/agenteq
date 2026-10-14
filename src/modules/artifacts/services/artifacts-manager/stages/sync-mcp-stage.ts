@@ -9,6 +9,7 @@ import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import discoverMcpServersAction from "@artifacts/actions/discover-mcp-servers-action.js";
+import { removeNamespace } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import reconcileMcpServersAction from "./mcp/actions/reconcile-mcp-servers-action.js";
@@ -16,8 +17,6 @@ import reconcileMcpServersAction from "./mcp/actions/reconcile-mcp-servers-actio
 /**
  * Discovers the canonical MCP servers, local plus a remote source's selected entries.
  * Reconciles each selected agent's config file against that set, marking one with no MCP support as unsupported.
- * Every server no longer in the set is removed from the file, agenteq owns the whole servers map,
- * whether it put a stale entry there itself or not.
  */
 export default async function syncMcpStage(
     payload: SyncPayload,
@@ -35,7 +34,11 @@ export default async function syncMcpStage(
  * Interface & Types.
  */
 
-interface FileWork {
+/**
+ * One agent config file's pending write, every mcp server it should end up with,
+ * and every agent that shares this same file path.
+ */
+interface PendingMcpWrite {
     mcp: McpConfiguration;
     agentDisplayNames: string[];
     servers: McpServer[];
@@ -46,14 +49,14 @@ interface InstallMcpServersResult {
     artifactPaths: string[];
 }
 
-interface CollectFileWorkOptions {
+interface CollectConfigWritesOptions {
     selectedAgents: Agent[];
     servers: McpServer[];
     cwd: string;
 }
 
-interface CollectFileWorkResult {
-    workByFile: Map<string, FileWork>;
+interface CollectConfigWritesResult {
+    writesByFile: Map<string, PendingMcpWrite>;
     results: SyncResult[];
 }
 
@@ -74,23 +77,26 @@ async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
     });
 
     const servers = [...localServers];
+
     const claimedKeys = new Set(localServers.map((server) => server.key));
 
     for (const remote of payload.remoteSources) {
         const remoteServers = await discoverMcpServersAction({
             cwd: remote.rootDir,
+            recursive: true,
             sourceDir: ".",
         });
 
+        // A saved mcp selection entry can carry a namespace prefix, but a server's own key never does.
+        const selectedKeys = new Set(remote.selection.mcp.map(removeNamespace));
+
         for (const server of remoteServers) {
-            if (
-                !remote.selection.mcp.includes(server.key) ||
-                claimedKeys.has(server.key)
-            ) {
+            if (!selectedKeys.has(server.key) || claimedKeys.has(server.key)) {
                 continue;
             }
 
             servers.push(server);
+
             claimedKeys.add(server.key);
         }
     }
@@ -105,7 +111,7 @@ async function installMcpServers(
 
     const servers = await collectMcpServers(payload);
 
-    const { results, workByFile } = collectFileWork({
+    const { results, writesByFile } = collectConfigWrites({
         cwd: cwd,
         selectedAgents: payload.selectedAgents,
         servers: servers,
@@ -113,10 +119,10 @@ async function installMcpServers(
 
     const artifactPaths: string[] = [];
 
-    for (const [filePath, work] of workByFile) {
-        const statusesByKey = await processFile(filePath, work);
+    for (const [filePath, write] of writesByFile) {
+        const statusesByKey = await processFile(filePath, write);
 
-        for (const agentDisplayName of work.agentDisplayNames) {
+        for (const agentDisplayName of write.agentDisplayNames) {
             for (const [key, status] of statusesByKey) {
                 results.push({
                     agent: agentDisplayName,
@@ -138,15 +144,15 @@ async function installMcpServers(
 }
 
 /**
- * Groups the canonical servers destined for each agent's config file, one file work entry per path.
- * An agent with no MCP support gets an unsupported result row per server instead, and no file work.
+ * Groups the canonical servers destined for each agent's config file, one config write per path.
+ * An agent with no MCP support gets an unsupported result row per server instead, and no config write.
  */
-function collectFileWork(
-    options: CollectFileWorkOptions,
-): CollectFileWorkResult {
+function collectConfigWrites(
+    options: CollectConfigWritesOptions,
+): CollectConfigWritesResult {
     const { cwd, selectedAgents, servers } = options;
 
-    const workByFile = new Map<string, FileWork>();
+    const writesByFile = new Map<string, PendingMcpWrite>();
     const results: SyncResult[] = [];
 
     for (const agent of selectedAgents) {
@@ -164,21 +170,21 @@ function collectFileWork(
         }
 
         const filePath = resolveConfigPath(agent.mcp, cwd);
-        const existing = workByFile.get(filePath);
+        const existing = writesByFile.get(filePath);
 
         if (existing) {
             existing.agentDisplayNames.push(agent.displayName);
             continue;
         }
 
-        workByFile.set(filePath, {
+        writesByFile.set(filePath, {
             agentDisplayNames: [agent.displayName],
             mcp: agent.mcp,
             servers: servers,
         });
     }
 
-    return { results: results, workByFile: workByFile };
+    return { results: results, writesByFile: writesByFile };
 }
 
 function resolveConfigPath(mcp: McpConfiguration, cwd: string): string {
@@ -212,15 +218,15 @@ function detectFormat(filePath: string): ConfigFileFormat {
  */
 async function processFile(
     filePath: string,
-    work: FileWork,
+    write: PendingMcpWrite,
 ): Promise<Map<string, SyncStatus>> {
     const format = detectFormat(filePath);
     const originalText = (await filesystem.readFile(filePath)) ?? "";
 
     const { statusesByKey, text } = reconcileMcpServersAction({
         format: format,
-        mcp: work.mcp,
-        servers: work.servers,
+        mcp: write.mcp,
+        servers: write.servers,
         text: originalText,
     });
 

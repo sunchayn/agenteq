@@ -33,7 +33,7 @@ describe("jsonFormatter", () => {
         });
     });
 
-    it("skips an entry that already matches, returning the text unchanged", () => {
+    it("still reports written for an entry that already matches, returning the text unchanged", () => {
         const first = jsonFormatter.reconcile({
             keyPath: ["mcpServers"],
             mapper: mapServer,
@@ -48,7 +48,7 @@ describe("jsonFormatter", () => {
             text: first.text,
         });
 
-        expect(second.statusesByKey.get("example")).toBe("skipped");
+        expect(second.statusesByKey.get("example")).toBe("written");
         expect(second.text).toBe(first.text);
     });
 

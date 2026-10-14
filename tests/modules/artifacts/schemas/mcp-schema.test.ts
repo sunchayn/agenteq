@@ -5,7 +5,6 @@ describe("mcpSchema", () => {
     it("accepts a valid stdio config", () => {
         const result = mcpSchema.safeParse({
             config: { args: ["-y", "example"], command: "npx" },
-            key: "example",
             type: "stdio",
         });
 
@@ -15,7 +14,6 @@ describe("mcpSchema", () => {
     it("accepts a stdio config with cwd", () => {
         const result = mcpSchema.safeParse({
             config: { command: "npx", cwd: "./servers/example" },
-            key: "example",
             type: "stdio",
         });
 
@@ -28,7 +26,6 @@ describe("mcpSchema", () => {
                 headers: { Authorization: "Bearer token" },
                 url: "https://example.com/sse",
             },
-            key: "example",
             type: "sse",
         });
 
@@ -41,7 +38,6 @@ describe("mcpSchema", () => {
                 headers: { "X-Api-Key": "secret" },
                 url: "https://example.com/mcp",
             },
-            key: "example",
             type: "http",
         });
 
@@ -51,7 +47,6 @@ describe("mcpSchema", () => {
     it("rejects an sse config missing url", () => {
         const result = mcpSchema.safeParse({
             config: {},
-            key: "example",
             type: "sse",
         });
 
@@ -62,7 +57,6 @@ describe("mcpSchema", () => {
         const result = mcpSchema.safeParse({
             $schema: "../../schema/mcp-config.schema.json",
             config: { url: "https://example.com/mcp" },
-            key: "example",
             type: "http",
         });
 
@@ -72,7 +66,6 @@ describe("mcpSchema", () => {
     it("rejects a stdio config missing command", () => {
         const result = mcpSchema.safeParse({
             config: {},
-            key: "example",
             type: "stdio",
         });
 
@@ -82,7 +75,6 @@ describe("mcpSchema", () => {
     it("rejects an http config missing url", () => {
         const result = mcpSchema.safeParse({
             config: {},
-            key: "example",
             type: "http",
         });
 

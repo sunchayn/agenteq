@@ -25,7 +25,6 @@ describe("discoverMcpServersAction", () => {
     it("captures unknown fields into `extra` instead of rejecting them", async () => {
         await writeConfig("example", {
             config: { command: "npx", timeout: 30, trust: true },
-            key: "example",
             type: "stdio",
         });
 
@@ -37,7 +36,6 @@ describe("discoverMcpServersAction", () => {
     it("returns no `extra` when every field is known", async () => {
         await writeConfig("example", {
             config: { command: "npx" },
-            key: "example",
             type: "stdio",
         });
 
@@ -47,10 +45,55 @@ describe("discoverMcpServersAction", () => {
     });
 
     it("throws a clear error for an invalid config", async () => {
-        await writeConfig("bad", { config: {}, key: "bad", type: "stdio" });
+        await writeConfig("bad", { config: {}, type: "stdio" });
 
         await expect(discoverMcpServersAction({ cwd: cwd })).rejects.toThrow(
             /command/,
         );
+    });
+
+    it("uses the config's own directory name as its key", async () => {
+        await writeConfig("renamed-server", {
+            config: { command: "npx" },
+            type: "stdio",
+        });
+
+        const [server] = await discoverMcpServersAction({ cwd: cwd });
+
+        expect(server.key).toBe("renamed-server");
+    });
+
+    it("ignores a config nested outside sourceDir when not recursive", async () => {
+        await mkdir(join(cwd, "backend/mcp/nested"), { recursive: true });
+        await writeFile(
+            join(cwd, "backend/mcp/nested/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        const servers = await discoverMcpServersAction({ cwd: cwd });
+
+        expect(servers).toEqual([]);
+    });
+
+    it("finds a config nested under any folder when recursive", async () => {
+        await mkdir(join(cwd, "backend/mcp/nested"), { recursive: true });
+        await writeFile(
+            join(cwd, "backend/mcp/nested/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        const servers = await discoverMcpServersAction({
+            cwd: cwd,
+            recursive: true,
+            sourceDir: ".",
+        });
+
+        expect(servers.map((server) => server.key)).toEqual(["nested"]);
     });
 });

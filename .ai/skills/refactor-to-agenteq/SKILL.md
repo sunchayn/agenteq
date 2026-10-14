@@ -52,11 +52,10 @@ If the table lists a commands directory for the primary agent, and it exists, co
 If the table lists an MCP config file for the primary agent, and it exists:
 
 1. Parse it (JSON, TOML, or JSONC, per the table). Read the entries at the table's MCP key path.
-2. Write each entry as `<source dir>/mcp/<key>/config.json`, pretty-printed, 4-space indentation, one field per line, never a single compact line:
+2. Write each entry as `<source dir>/mcp/<key>/config.json`, the directory name is the entry's key, there is no separate `"key"` field. Pretty-printed, 4-space indentation, one field per line, never a single compact line:
 
     ```json
     {
-        "key": "<entry key>",
         "type": "stdio | http | sse",
         "config": { }
     }

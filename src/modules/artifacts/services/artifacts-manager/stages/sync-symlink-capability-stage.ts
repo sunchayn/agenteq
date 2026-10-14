@@ -7,11 +7,12 @@ import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
+import { NAMESPACE_SEPARATOR } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import { AGENTEQ_SOURCES_ROOT } from "@support/utils/agenteq-sources-root.js";
 
 /**
  * Reusable sync stage to mirror one symlink-configured capability (commands or skills) into every selected agent.
- * Reads them from the canonical source directory, plus every configured remote source, in order.
+ * Mirrors the local canonical source, then every configured remote source, as one ordered list of directories.
  * A local capability always wins a same-key collision, then the first remote to claim a key wins.
  */
 export default async function syncSymlinkCapabilityStage(
@@ -43,19 +44,21 @@ interface SyncAgentsResult {
     artifactPaths: string[];
 }
 
-interface RemoteSourceDir {
-    name: string;
+/**
+ * One directory to mirror files from, the local canonical source or one namespace of one remote source.
+ * `selection` lists the names allowed from this directory. Every file mirrors when it is omitted,
+ * the case for the local source, which has no selection to filter against.
+ */
+interface SourceDir {
     dir: string;
-    selection: ResolvedRemoteSource["selection"];
+    selection?: string[];
 }
 
 interface SyncOneAgentOptions {
     agent: Agent;
     capability: AgentCapability.Commands | AgentCapability.Skills;
     cwd: string;
-    source: string;
-    remoteSourceDirs: RemoteSourceDir[];
-    hasLocalSource: boolean;
+    sourceDirs: SourceDir[];
     targetRelDir: string;
 }
 
@@ -72,26 +75,18 @@ async function syncAgents(
     capability: AgentCapability.Commands | AgentCapability.Skills,
     payload: SyncPayload,
 ): Promise<SyncAgentsResult> {
-    const source = sourceDirFor(
-        capability,
-        payload.context.cwd,
-        payload.context.sourceDir,
-    );
-
-    const remoteSourceDirs = remoteSourceDirsFor(capability, payload);
+    const sourceDirs = sourceDirsFor(capability, payload);
 
     // Runs before the early return below, since a removed remote source leaves nothing else to sync.
     await pruneOrphanedRemoteSymlinks(capability, payload);
 
-    const hasLocalSource = await filesystem.exists(source);
-
-    const hasAnyRemoteSource = (
+    const hasAnySource = (
         await Promise.all(
-            remoteSourceDirs.map((remote) => filesystem.exists(remote.dir)),
+            sourceDirs.map((sourceDir) => filesystem.exists(sourceDir.dir)),
         )
     ).some(Boolean);
 
-    if (!hasLocalSource && !hasAnyRemoteSource) {
+    if (!hasAnySource) {
         return { artifactPaths: [], results: [] };
     }
 
@@ -116,9 +111,7 @@ async function syncAgents(
             agent: agent,
             capability: capability,
             cwd: payload.context.cwd,
-            hasLocalSource: hasLocalSource,
-            remoteSourceDirs: remoteSourceDirs,
-            source: source,
+            sourceDirs: sourceDirs,
             targetRelDir: targetRelDir,
         });
 
@@ -162,19 +155,11 @@ async function pruneOrphanedRemoteSymlinks(
 async function syncOneAgent(
     options: SyncOneAgentOptions,
 ): Promise<SyncOneAgentResult> {
-    const {
-        agent,
-        capability,
-        cwd,
-        hasLocalSource,
-        remoteSourceDirs,
-        source,
-        targetRelDir,
-    } = options;
+    const { agent, capability, cwd, sourceDirs, targetRelDir } = options;
 
     const targetDir = join(cwd, targetRelDir);
 
-    // Only commands ever need renaming, e.g. Copilot's ".prompt.md" requirement, since skills always keep the fixed "SKILL.md" filename.
+    // Only commands ever need renaming, e.g. Copilot's ".prompt.md" requirement.
     const commandsFileExtension = agent.commandsFileExtension;
 
     const renameFile =
@@ -183,39 +168,30 @@ async function syncOneAgent(
             : undefined;
 
     try {
-        const localFiles = hasLocalSource
-            ? await mirrorDir({
-                  renameFile: renameFile,
-                  sourceDir: source,
-                  targetDir: targetDir,
-              })
-            : [];
+        // Earlier directories win a same-name collision over every later one, the local source,
+        // always listed first, wins over every remote, then each remote wins over every later one.
+        const claimedNames = new Set<string>();
 
-        // Local wins first, then each remote in configured order wins over every later one.
-        const claimedNames = new Set(localFiles.map(topLevelName));
+        let fileCount = 0;
 
-        let remoteFileCount = 0;
-
-        for (const remote of remoteSourceDirs) {
-            const remoteFiles = await mirrorDir({
-                filterFiles: remoteFileFilterFor(
+        for (const sourceDir of sourceDirs) {
+            const files = await mirrorDir({
+                filterFiles: buildFilesFilterFor(
                     capability,
-                    remote.selection,
+                    sourceDir.selection,
                     claimedNames,
                 ),
                 renameFile: renameFile,
-                sourceDir: remote.dir,
+                sourceDir: sourceDir.dir,
                 targetDir: targetDir,
             });
 
-            for (const file of remoteFiles) {
+            for (const file of files) {
                 claimedNames.add(topLevelName(file));
             }
 
-            remoteFileCount += remoteFiles.length;
+            fileCount += files.length;
         }
-
-        const fileCount = localFiles.length + remoteFileCount;
 
         return {
             fileCount: fileCount,
@@ -241,33 +217,33 @@ async function syncOneAgent(
 }
 
 /**
- * A file is mirrored only when it's in this remote's saved selection.
- * Its top-level name, the skill directory or the command file, must have no local or earlier-remote claim.
+ * Builds the predicate deciding whether one mirrored file from a source directory is allowed.
  */
-function remoteFileFilterFor(
+function buildFilesFilterFor(
     capability: AgentCapability.Commands | AgentCapability.Skills,
-    selection: ResolvedRemoteSource["selection"],
+    selection: string[] | undefined,
     excludedNames: ReadonlySet<string>,
 ): (file: string) => boolean {
-    const selectedNames = new Set(
-        capability === AgentCapability.Skills
-            ? selection.skills
-            : selection.commands,
-    );
+    const selectedNames = selection ? new Set(selection) : undefined;
 
     return function (file) {
-        if (capability === AgentCapability.Skills) {
-            // Skills select and collide by top-level directory name, since a whole skill directory is one unit.
-            return (
-                selectedNames.has(topLevelName(file)) &&
-                !excludedNames.has(topLevelName(file))
-            );
+        const name = topLevelName(file);
+
+        // An earlier source directory already placed a file under this top-level name.
+        if (excludedNames.has(name)) {
+            return false;
         }
 
-        // Commands select and collide by exact file path, since each command is one standalone file.
-        return (
-            selectedNames.has(file) && !excludedNames.has(topLevelName(file))
-        );
+        // No selection to filter against, every file from this source directory qualifies.
+        if (!selectedNames) {
+            return true;
+        }
+
+        // Skills select by top-level directory name, since a whole skill directory is one unit,
+        // commands select by exact file path, since each command is one standalone file.
+        return capability === AgentCapability.Skills
+            ? selectedNames.has(name)
+            : selectedNames.has(file);
     };
 }
 
@@ -275,30 +251,85 @@ function topLevelName(file: string): string {
     return file.split("/")[0];
 }
 
-function sourceDirFor(
+/**
+ * Every directory to mirror from. The local canonical source comes first,
+ * then every configured remote source's namespace directories, in order.
+ */
+function sourceDirsFor(
     capability: AgentCapability.Commands | AgentCapability.Skills,
-    cwd: string,
-    sourceDir: string,
-): string {
-    return join(
-        cwd,
-        sourceDir,
-        capability === AgentCapability.Commands ? "commands" : "skills",
+    payload: SyncPayload,
+): SourceDir[] {
+    const localDir = join(
+        payload.context.cwd,
+        payload.context.sourceDir,
+        capability,
     );
+
+    return [{ dir: localDir }, ...remoteSourceDirsFor(capability, payload)];
 }
 
+/**
+ * Every namespace directory to mirror from, across every configured remote source.
+ * Preserves the order the remotes were configured in.
+ */
 function remoteSourceDirsFor(
     capability: AgentCapability.Commands | AgentCapability.Skills,
     payload: SyncPayload,
-): RemoteSourceDir[] {
-    return payload.remoteSources.map((remote) => ({
-        dir: join(
-            remote.rootDir,
-            capability === AgentCapability.Commands ? "commands" : "skills",
-        ),
-        name: remote.name,
-        selection: remote.selection,
-    }));
+): SourceDir[] {
+    return payload.remoteSources.flatMap((remote) =>
+        namespaceDirsFor(capability, remote),
+    );
+}
+
+/**
+ * One remote's namespace directories, its root namespace first, then the rest alphabetically.
+ * A remote whose selection mixes a root skill and a backend-namespaced one, for example,
+ * returns two entries here, one for the root `skills` folder and one for `backend/skills`.
+ */
+function namespaceDirsFor(
+    capability: AgentCapability.Commands | AgentCapability.Skills,
+    remote: ResolvedRemoteSource,
+): SourceDir[] {
+    const selection =
+        capability === AgentCapability.Skills
+            ? remote.selection.skills
+            : remote.selection.commands;
+
+    const selectionByNamespace = groupByNamespace(selection);
+
+    return [...selectionByNamespace.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([namespace, groupedSelection]) => ({
+            dir: join(remote.rootDir, namespace, capability),
+            selection: groupedSelection,
+        }));
+}
+
+/**
+ * Groups a remote's saved selection by namespace, stripping the namespace prefix off each entry.
+ * An entry with no namespace prefix, a root-level item, groups under the empty namespace.
+ */
+function groupByNamespace(selection: string[]): Map<string, string[]> {
+    const selectionByNamespace = new Map<string, string[]>();
+
+    for (const entry of selection) {
+        const separatorIndex = entry.indexOf(NAMESPACE_SEPARATOR);
+
+        const namespace =
+            separatorIndex === -1 ? "" : entry.slice(0, separatorIndex);
+
+        const name =
+            separatorIndex === -1
+                ? entry
+                : entry.slice(separatorIndex + NAMESPACE_SEPARATOR.length);
+
+        selectionByNamespace.set(namespace, [
+            ...(selectionByNamespace.get(namespace) ?? []),
+            name,
+        ]);
+    }
+
+    return selectionByNamespace;
 }
 
 function targetDirFor(
@@ -312,7 +343,7 @@ function targetDirFor(
 
 /**
  * Mirrors every source file into the target directory via symlinks, optionally filtered.
- * Returns the list of files actually mirrored.
+ * Returns the list of files actually mirrored. A source directory that does not exist mirrors nothing.
  */
 async function mirrorDir(options: MirrorDirOptions): Promise<string[]> {
     const { filterFiles, renameFile, sourceDir, targetDir } = options;

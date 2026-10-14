@@ -1,6 +1,5 @@
 {
     "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
-    "key": "example-stdio-server",
     "type": "stdio",
     "config": {
         "command": "npx",

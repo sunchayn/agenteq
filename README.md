@@ -132,6 +132,8 @@ The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer a
 
 Alongside your local canonical source directory, you can point Agenteq at any number of named remote git repositories, each with the same layout, `mcp/`, `commands/`, `skills/`, `GUIDELINES.md` at its root. Agenteq combines every source into one set of synced artifacts.
 
+A remote repository can also classify its skills, commands, and MCP servers under a sub-folder, e.g. `backend/skills/`, `backend/commands/`, `backend/mcp/`, alongside anything already at its root. The picker groups a classified sub-folder under its own name, so you can pick a whole group at once. `GUIDELINES.md` stays root-only, it is never picked up from a sub-folder.
+
 On `local <> remote` collision, local wins and on `remote <> remote` collection, whichever remote was added first wins.
 
 ```mermaid
@@ -239,7 +241,6 @@ Agenteq reads `boost.json`, the file Boost writes naming which agent(s) it targe
 
     ```json
     {
-        "key": "laravel-boost",
         "type": "stdio",
         "config": { "command": "php", "args": ["artisan", "boost:mcp"] }
     }
@@ -267,7 +268,7 @@ If a command fails, the error message starts with a code in parentheses, for exa
 
 ### MCP config
 
-Each `.ai/mcp/<name>/config.json` file describes one MCP server. It has a `key` naming it, a `type`, and a `config` object shaped by that type.
+Each `.ai/mcp/<name>/config.json` file describes one MCP server. Its `<name>` directory name is the server's key, naming it, alongside a `type` and a `config` object shaped by that type.
 
 > [!TIP]
 > You can point `$schema` at the schema shipped with this package to get validation and autocomplete in your editor.
@@ -275,7 +276,6 @@ Each `.ai/mcp/<name>/config.json` file describes one MCP server. It has a `key` 
 ```json
 {
     "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
-    "key": "example-server",
     "type": "http",
     "config": {
         "url": "https://example.com/mcp",

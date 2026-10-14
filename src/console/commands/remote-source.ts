@@ -16,6 +16,7 @@ import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-ac
 import loadRemoteSourcesFileAction from "@artifacts/actions/load-remote-sources-file-action.js";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import discoverRemoteCapabilitiesAction, {
+    NAMESPACE_SEPARATOR,
     type RemoteCapabilities,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import RemoteSourcesFile, {
@@ -464,27 +465,27 @@ async function promptForSelection(
 ): Promise<RemoteSourceSelection> {
     const skills =
         capabilities.skills.length > 0
-            ? await promptMultiselect(
+            ? await promptGroupMultiselect(
                   "Select skills to sync from this source",
-                  capabilities.skills,
+                  namespacedOptions(capabilities.skills),
                   current.skills,
               )
             : [];
 
     const commands =
         capabilities.commands.length > 0
-            ? await promptMultiselect(
+            ? await promptGroupMultiselect(
                   "Select commands to sync from this source",
-                  capabilities.commands,
+                  namespacedOptions(capabilities.commands),
                   current.commands,
               )
             : [];
 
     const mcp =
         capabilities.mcp.length > 0
-            ? await promptMultiselect(
+            ? await promptGroupMultiselect(
                   "Select mcp servers to sync from this source",
-                  capabilities.mcp,
+                  namespacedOptions(capabilities.mcp),
                   current.mcp,
               )
             : [];
@@ -504,15 +505,56 @@ async function promptForSelection(
     };
 }
 
-async function promptMultiselect(
+const ROOT_GROUP_LABEL = "(root)";
+
+interface GroupableOption {
+    group: string;
+    label: string;
+    value: string;
+}
+
+/**
+ * Builds one groupable option per skill, command, or mcp server identifier.
+ * Its group is the namespace encoded in that identifier.
+ * A root item, with no namespace, groups under a fixed root label and keeps its bare name as its label.
+ */
+function namespacedOptions(items: string[]): GroupableOption[] {
+    return items.map((item) => {
+        const separatorIndex = item.indexOf(NAMESPACE_SEPARATOR);
+
+        return separatorIndex === -1
+            ? { group: ROOT_GROUP_LABEL, label: item, value: item }
+            : {
+                  group: item.slice(0, separatorIndex),
+                  label: item.slice(
+                      separatorIndex + NAMESPACE_SEPARATOR.length,
+                  ),
+                  value: item,
+              };
+    });
+}
+
+/**
+ * Shows a picker grouping its options, letting the user select a whole classified sub-folder at once.
+ */
+async function promptGroupMultiselect(
     message: string,
-    items: string[],
+    items: GroupableOption[],
     initialValues: string[],
 ): Promise<string[]> {
-    const picked = await input.multiselect({
+    const options: Record<string, { label: string; value: string }[]> = {};
+
+    for (const item of items) {
+        options[item.group] = [
+            ...(options[item.group] ?? []),
+            { label: item.label, value: item.value },
+        ];
+    }
+
+    const picked = await input.groupMultiselect({
         initialValues: initialValues,
         message: message,
-        options: items.map((item) => ({ label: item, value: item })),
+        options: options,
     });
 
     if (input.isCancel(picked)) {

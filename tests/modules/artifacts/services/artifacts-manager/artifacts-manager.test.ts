@@ -98,7 +98,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -141,7 +140,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -170,7 +168,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/first/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "first",
                 type: "stdio",
             }),
         );
@@ -180,7 +177,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/second/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "second",
                 type: "stdio",
             }),
         );
@@ -217,7 +213,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -288,7 +283,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -302,7 +296,7 @@ describe("artifactsManager.sync", () => {
         expect(outcome.gitignoreAlerts).toEqual([".mcp.json"]);
     });
 
-    it("still gitignores and flags an mcp config file whose entry already matched and needed no write", async () => {
+    it("still reports written and gitignores an mcp entry that already matched and needed no write", async () => {
         spawnSync("git", ["init", "--quiet"], { cwd: cwd });
         spawnSync("git", ["config", "user.email", "test@example.com"], {
             cwd: cwd,
@@ -324,7 +318,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -335,7 +328,7 @@ describe("artifactsManager.sync", () => {
             selectedAgents: [testAgent],
         });
 
-        expect(outcome.results[0].status).toBe(SyncStatus.Skipped);
+        expect(outcome.results[0].status).toBe(SyncStatus.Written);
         expect(outcome.gitignoreAlerts).toEqual([".mcp.json"]);
         expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(
             ".mcp.json",
@@ -348,7 +341,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -363,7 +355,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { args: ["--verbose"], command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -387,7 +378,6 @@ describe("artifactsManager.sync", () => {
             join(cwd, ".ai/mcp/example/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "example",
                 type: "stdio",
             }),
         );
@@ -567,7 +557,6 @@ describe("syncMcpAction with a remote source", () => {
             join(cwd, ".ai/mcp/local-only/config.json"),
             JSON.stringify({
                 config: { command: "local" },
-                key: "local-only",
                 type: "stdio",
             }),
         );
@@ -577,7 +566,6 @@ describe("syncMcpAction with a remote source", () => {
             join(cwd, ".ai/mcp/shared/config.json"),
             JSON.stringify({
                 config: { command: "local-shared" },
-                key: "shared",
                 type: "stdio",
             }),
         );
@@ -587,7 +575,6 @@ describe("syncMcpAction with a remote source", () => {
             join(remoteRoot, "mcp/shared/config.json"),
             JSON.stringify({
                 config: { command: "remote-shared" },
-                key: "shared",
                 type: "stdio",
             }),
         );
@@ -597,7 +584,6 @@ describe("syncMcpAction with a remote source", () => {
             join(remoteRoot, "mcp/remote-only/config.json"),
             JSON.stringify({
                 config: { command: "remote" },
-                key: "remote-only",
                 type: "stdio",
             }),
         );
@@ -689,6 +675,62 @@ describe("syncMcpAction with a remote source", () => {
             "local-only",
             "shared",
         ]);
+    });
+
+    it("installs a namespaced mcp server nested under a classified sub-folder", async () => {
+        await mkdir(join(remoteRoot, "backend/mcp/backend-shared-server"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/mcp/backend-shared-server/config.json"),
+            JSON.stringify({
+                config: { command: "backend-remote" },
+                type: "stdio",
+            }),
+        );
+
+        await saveRemoteSourcesFileAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            remotes: {
+                team: {
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: ["backend::backend-shared-server"],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            },
+            shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            name: "team",
+            path: remoteRoot,
+        });
+
+        await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [mcpAgent],
+        });
+
+        const written = JSON.parse(
+            await readFile(join(cwd, ".mcp.json"), "utf8"),
+        );
+
+        expect(Object.keys(written.mcpServers).sort()).toEqual([
+            "backend-shared-server",
+            "local-only",
+            "shared",
+        ]);
+
+        expect(written.mcpServers["backend-shared-server"].command).toBe(
+            "backend-remote",
+        );
     });
 });
 
@@ -1350,5 +1392,81 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
         ).toBe("shared");
 
         await rm(secondRemoteRoot, { force: true, recursive: true });
+    });
+
+    it("mirrors a namespaced item from a classified sub-folder, flattened at the target", async () => {
+        await mkdir(join(remoteRoot, "backend/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/commands/nested.md"),
+            "nested",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        const result = await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["shared.md", "backend::nested.md"],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        expect(result.results[0].item).toBe("3 file(s)");
+
+        expect(
+            await readFile(join(cwd, ".test/commands/nested.md"), "utf8"),
+        ).toBe("nested");
+    });
+
+    it("lets a root item win a same-name collision against a namespaced one", async () => {
+        await mkdir(join(remoteRoot, "backend/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/commands/shared.md"),
+            "backend copy",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["shared.md", "backend::shared.md"],
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        expect(
+            await readFile(join(cwd, ".test/commands/shared.md"), "utf8"),
+        ).toBe("shared");
     });
 });
