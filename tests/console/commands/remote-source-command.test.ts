@@ -304,7 +304,7 @@ describe("agenteq remote-source add (interactive picker)", () => {
         ]);
 
         const mcpCall = groupMultiselectMock.mock.calls.find(([params]) =>
-            String(params.message).includes("mcp servers"),
+            String(params.message).includes("MCP servers"),
         );
 
         expect(mcpCall?.[0].options).toEqual({
@@ -823,7 +823,7 @@ describe("agenteq remote-source update-choices", () => {
         ]);
 
         const mcpCall = groupMultiselectMock.mock.calls.find(([params]) =>
-            String(params.message).includes("mcp servers"),
+            String(params.message).includes("MCP servers"),
         );
 
         expect(mcpCall?.[0].initialValues).not.toContain(

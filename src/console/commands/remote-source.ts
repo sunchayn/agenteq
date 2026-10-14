@@ -466,7 +466,7 @@ async function promptForSelection(
     const skills =
         capabilities.skills.length > 0
             ? await promptGroupMultiselect(
-                  "Select skills to sync from this source",
+                  `Select ${pc.bold("Skills")} to sync from this source`,
                   namespacedOptions(capabilities.skills),
                   current.skills,
               )
@@ -475,7 +475,7 @@ async function promptForSelection(
     const commands =
         capabilities.commands.length > 0
             ? await promptGroupMultiselect(
-                  "Select commands to sync from this source",
+                  `Select ${pc.bold("Commands")} to sync from this source`,
                   namespacedOptions(capabilities.commands),
                   current.commands,
               )
@@ -484,7 +484,7 @@ async function promptForSelection(
     const mcp =
         capabilities.mcp.length > 0
             ? await promptGroupMultiselect(
-                  "Select mcp servers to sync from this source",
+                  `Select ${pc.bold("MCP servers")} to sync from this source`,
                   namespacedOptions(capabilities.mcp),
                   current.mcp,
               )
@@ -492,7 +492,7 @@ async function promptForSelection(
 
     const guidelines = capabilities.hasGuidelines
         ? await promptConfirm(
-              "Sync this source's GUIDELINES.md?",
+              `Sync this source's ${pc.bold("GUIDELINES.md")}?`,
               current.guidelines,
           )
         : false;
