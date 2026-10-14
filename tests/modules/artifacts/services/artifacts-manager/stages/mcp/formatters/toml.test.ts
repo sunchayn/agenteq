@@ -44,7 +44,7 @@ describe("tomlFormatter", () => {
         expect(result.text).toContain("[mcp_servers.example]");
     });
 
-    it("skips an entry that already matches", () => {
+    it("still reports written for an entry that already matches", () => {
         const first = tomlFormatter.reconcile({
             keyPath: ["mcp_servers"],
             mapper: mapServer,
@@ -59,7 +59,7 @@ describe("tomlFormatter", () => {
             text: first.text,
         });
 
-        expect(second.statusesByKey.get("example")).toBe("skipped");
+        expect(second.statusesByKey.get("example")).toBe("written");
     });
 
     it("re-writes an entry whose canonical config changed since it was last synced", () => {

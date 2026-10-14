@@ -63,11 +63,10 @@ For every agent from step 4:
 
 1. Read its own MCP config file. Use the table in section 14 for the file path, format, key path, and native field names.
 2. Parse the file (JSON, TOML, or JSONC, per the table). Read the entries at the key path.
-3. For every entry except `laravel-boost`, write `.ai/mcp/<key>/config.json`, pretty-printed, 4-space indentation, one field per line, never a single compact line:
+3. For every entry except `laravel-boost`, write `.ai/mcp/<key>/config.json`, the directory name is the entry's key, there is no separate `"key"` field. Pretty-printed, 4-space indentation, one field per line, never a single compact line:
 
     ```json
     {
-        "key": "<entry key>",
         "type": "stdio | http | sse",
         "config": { }
     }
@@ -98,7 +97,6 @@ Handle the `laravel-boost` entry as its own case:
 
     ```json
     {
-        "key": "laravel-boost",
         "type": "stdio",
         "config": { "command": "php", "args": ["artisan", "boost:mcp"] }
     }

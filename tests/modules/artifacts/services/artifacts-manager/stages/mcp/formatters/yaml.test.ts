@@ -43,7 +43,7 @@ describe("yamlFormatter", () => {
         expect(result.text).toContain("extensions:");
     });
 
-    it("skips an entry that already matches", () => {
+    it("still reports written for an entry that already matches", () => {
         const first = yamlFormatter.reconcile({
             keyPath: ["extensions"],
             mapper: mapServer,
@@ -58,7 +58,7 @@ describe("yamlFormatter", () => {
             text: first.text,
         });
 
-        expect(second.statusesByKey.get("example")).toBe("skipped");
+        expect(second.statusesByKey.get("example")).toBe("written");
     });
 
     it("re-writes an entry whose canonical config changed since it was last synced", () => {

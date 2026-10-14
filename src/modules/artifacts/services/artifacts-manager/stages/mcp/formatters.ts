@@ -6,7 +6,7 @@ import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 
 /**
- * Reconciles a JSON file's servers map against the canonical set.
+ * Reconciles a JSON file's servers map against the servers given.
  */
 export const jsonFormatter: McpFormatter = {
     format: ConfigFileFormat.Json,
@@ -14,7 +14,7 @@ export const jsonFormatter: McpFormatter = {
 };
 
 /**
- * Reconciles a TOML file's servers map against the canonical set.
+ * Reconciles a TOML file's servers map against the servers given.
  */
 export const tomlFormatter: McpFormatter = {
     format: ConfigFileFormat.Toml,
@@ -22,7 +22,7 @@ export const tomlFormatter: McpFormatter = {
 };
 
 /**
- * Reconciles a YAML file's servers map against the canonical set.
+ * Reconciles a YAML file's servers map against the servers given.
  */
 export const yamlFormatter: McpFormatter = {
     format: ConfigFileFormat.Yaml,
@@ -48,9 +48,9 @@ export interface ReconcileFormatOptions {
 export interface FormatReconcileResult {
     text: string;
     /**
-     * One status per key that changed at the servers map.
-     * Written or skipped for a canonical server, removed for a key that was there,
-     * but is no longer part of the canonical set.
+     * One status per key in the servers map that was just written or just removed.
+     * Written for a server given this run, whether or not its entry actually changed.
+     * Removed for a key that was there, but is no longer among the servers given.
      */
     statusesByKey: Map<string, SyncStatus>;
 }
@@ -64,9 +64,8 @@ function toJsonText(doc: Record<string, unknown>): string {
 }
 
 /**
- * Parses a config file's text, then replaces the object at the key path with exactly the canonical servers,
- * mapped to this agent's shape, then stringifies the result back to text.
- * Every key at that path not in the canonical set is dropped, agenteq owns that whole map.
+ * Reconciles the object at a config file's key path against the servers given.
+ * Every key at that path not among those servers is dropped, agenteq owns that whole map.
  * Sibling keys outside the key path, such as an agent's other settings, are left untouched.
  */
 function reconcileText(
@@ -115,12 +114,11 @@ function reconcileText(
     }
 
     for (const [key, mapped] of desiredByKey) {
-        if (JSON.stringify(target[key]) === JSON.stringify(mapped)) {
-            statusesByKey.set(key, SyncStatus.Skipped);
-            continue;
+        if (JSON.stringify(target[key]) !== JSON.stringify(mapped)) {
+            target[key] = mapped;
         }
 
-        target[key] = mapped;
+        // Reported as written whether or not this run changed it, the server is synced either way.
         statusesByKey.set(key, SyncStatus.Written);
     }
 

@@ -77,12 +77,11 @@ Read:
 - `GUIDELINES.md`, if present.
 - Every skill directory under `skills/`.
 - Every command file under `commands/`.
-- Every `mcp/<key>/config.json`, already in the canonical shape:
+- Every `mcp/<key>/config.json`, already in the canonical shape, the directory name is the entry's key, there is no separate `"key"` field:
 
 ```json
 {
     "$schema": "https://unpkg.com/agenteq/dist/schema/mcp-config.schema.json",
-    "key": "<entry key>",
     "type": "stdio | http | sse",
     "config": { }
 }

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import git from "@infrastructure/git.js";
 import AgentsFile from "@agents/entities/agents-file.js";
 import RemoteSourcesFile from "@artifacts/entities/remote-sources-file.js";
+import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
 const { registerRemoteSourceCommand } =
@@ -72,7 +73,11 @@ describe("agenteq remote-source add (interactive picker)", () => {
 
         const isTTYMock = vi.fn().mockReturnValue(true);
         const isCIMock = vi.fn().mockReturnValue(false);
-        const multiselectMock = vi.fn().mockResolvedValue(["writing-tests"]);
+
+        const groupMultiselectMock = vi
+            .fn()
+            .mockResolvedValue(["writing-tests"]);
+
         const confirmMock = vi.fn().mockResolvedValue(false);
         const isCancelMock = vi.fn().mockReturnValue(false);
 
@@ -83,10 +88,10 @@ describe("agenteq remote-source add (interactive picker)", () => {
             return {
                 ...actual,
                 confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
                 isCancel: isCancelMock,
                 isCI: isCIMock,
                 isTTY: isTTYMock,
-                multiselect: multiselectMock,
             };
         });
 
@@ -125,6 +130,198 @@ describe("agenteq remote-source add (interactive picker)", () => {
 
         expect(saved.get("team")?.selection.skills).toEqual(["writing-tests"]);
         expect(saved.get("team")?.selection.guidelines).toBe(false);
+
+        vi.doUnmock("@clack/prompts");
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("groups a namespaced skill under its own group, alongside a root group", async () => {
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+
+        const groupMultiselectMock = vi
+            .fn()
+            .mockResolvedValue(["backend::backend-example"]);
+
+        const confirmMock = vi.fn().mockResolvedValue(false);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const originDir = await createOrigin();
+
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const rootSkillDir = join(originDir, "skills/writing-tests");
+
+        const nestedSkillDir = join(
+            originDir,
+            "backend/skills/backend-example",
+        );
+
+        await mkdir(rootSkillDir, { recursive: true });
+        await writeFile(join(rootSkillDir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(nestedSkillDir, { recursive: true });
+        await writeFile(join(nestedSkillDir, "SKILL.md"), "hello", "utf8");
+
+        runGit(originDir, ["add", "skills", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add skills"]);
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const [{ options }] = groupMultiselectMock.mock.calls[0];
+
+        expect(options).toEqual({
+            "(root)": [{ label: "writing-tests", value: "writing-tests" }],
+            backend: [
+                {
+                    label: "backend-example",
+                    value: "backend::backend-example",
+                },
+            ],
+        });
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.skills).toEqual([
+            "backend::backend-example",
+        ]);
+
+        vi.doUnmock("@clack/prompts");
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("groups an mcp server under the namespace it was found under", async () => {
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+
+        const groupMultiselectMock = vi
+            .fn()
+            .mockResolvedValue(["backend::backend-shared-server"]);
+
+        const confirmMock = vi.fn().mockResolvedValue(false);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const originDir = await createOrigin();
+
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const rootMcpDir = join(originDir, "mcp/root-server");
+
+        const nestedMcpDir = join(
+            originDir,
+            "backend/mcp/backend-shared-server",
+        );
+
+        await mkdir(rootMcpDir, { recursive: true });
+        await writeFile(
+            join(rootMcpDir, "config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+            "utf8",
+        );
+
+        await mkdir(nestedMcpDir, { recursive: true });
+        await writeFile(
+            join(nestedMcpDir, "config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+            "utf8",
+        );
+
+        runGit(originDir, ["add", "mcp", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add mcp servers"]);
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const mcpCall = groupMultiselectMock.mock.calls.find(([params]) =>
+            String(params.message).includes("MCP servers"),
+        );
+
+        expect(mcpCall?.[0].options).toEqual({
+            "(root)": [{ label: "root-server", value: "root-server" }],
+            backend: [
+                {
+                    label: "backend-shared-server",
+                    value: "backend::backend-shared-server",
+                },
+            ],
+        });
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.mcp).toEqual([
+            "backend::backend-shared-server",
+        ]);
 
         vi.doUnmock("@clack/prompts");
         await rm(originDir, { force: true, recursive: true });
@@ -526,6 +723,120 @@ describe("agenteq remote-source update-choices", () => {
             ]),
         ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_NEEDS_PROMPT" });
 
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("drops a saved value no longer offered instead of carrying it into the new selection", async () => {
+        const originDir = await createOrigin();
+
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const mcpDir = join(originDir, "mcp/shared-http-server");
+
+        await mkdir(mcpDir, { recursive: true });
+        await writeFile(
+            join(mcpDir, "config.json"),
+            JSON.stringify({
+                config: { url: "https://example.com/mcp" },
+                type: "http",
+            }),
+            "utf8",
+        );
+
+        runGit(originDir, ["add", "mcp"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add mcp server"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--yes",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        // A stale saved value this repository's current mcp servers no longer match.
+        const saved = await readSavedFile();
+        const savedEntry = saved.get("team");
+
+        if (!savedEntry) {
+            throw new Error("Expected the team remote to be saved already.");
+        }
+
+        await saveRemoteSourcesFileAction({
+            context: context,
+            remotes: {
+                team: {
+                    selection: {
+                        ...savedEntry.selection,
+                        mcp: ["backend-shared-server"],
+                    },
+                    url: originDir,
+                },
+            },
+            shouldIgnore: false,
+        });
+
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+
+        const groupMultiselectMock = vi
+            .fn()
+            .mockResolvedValue(["shared-http-server"]);
+
+        const confirmMock = vi.fn().mockResolvedValue(true);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "update-choices",
+            "team",
+        ]);
+
+        const mcpCall = groupMultiselectMock.mock.calls.find(([params]) =>
+            String(params.message).includes("MCP servers"),
+        );
+
+        expect(mcpCall?.[0].initialValues).not.toContain(
+            "backend-shared-server",
+        );
+
+        const updated = await readSavedFile();
+
+        expect(updated.get("team")?.selection.mcp).toEqual([
+            "shared-http-server",
+        ]);
+
+        vi.doUnmock("@clack/prompts");
         await rm(originDir, { force: true, recursive: true });
     });
 });

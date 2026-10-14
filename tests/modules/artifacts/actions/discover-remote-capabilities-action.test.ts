@@ -62,7 +62,6 @@ describe("discoverRemoteCapabilitiesAction", () => {
             join(rootDir, "mcp/context7/config.json"),
             JSON.stringify({
                 config: { command: "npx" },
-                key: "context7",
                 type: "stdio",
             }),
         );
@@ -82,5 +81,118 @@ describe("discoverRemoteCapabilitiesAction", () => {
         });
 
         expect(result.hasGuidelines).toBe(true);
+    });
+
+    it("namespaces a skill nested under a classified sub-folder, alongside a root one", async () => {
+        await mkdir(join(rootDir, "skills/writing-tests"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(rootDir, "skills/writing-tests/SKILL.md"),
+            "hello",
+        );
+
+        await mkdir(join(rootDir, "backend/skills/backend-example"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(rootDir, "backend/skills/backend-example/SKILL.md"),
+            "hello",
+        );
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.skills.sort()).toEqual([
+            "backend::backend-example",
+            "writing-tests",
+        ]);
+    });
+
+    it("namespaces a command nested under a classified sub-folder, alongside a root one", async () => {
+        await mkdir(join(rootDir, "commands"), { recursive: true });
+        await writeFile(join(rootDir, "commands/deploy.md"), "hello");
+
+        await mkdir(join(rootDir, "backend/commands"), { recursive: true });
+        await writeFile(join(rootDir, "backend/commands/deploy.md"), "hello");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.commands.sort()).toEqual([
+            "backend::deploy.md",
+            "deploy.md",
+        ]);
+    });
+
+    it("namespaces an mcp server nested under a classified sub-folder, by its directory name", async () => {
+        await mkdir(join(rootDir, "mcp/root-server"), { recursive: true });
+        await writeFile(
+            join(rootDir, "mcp/root-server/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        await mkdir(join(rootDir, "backend/mcp/backend-shared-server"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(rootDir, "backend/mcp/backend-shared-server/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.mcp.sort()).toEqual([
+            "backend::backend-shared-server",
+            "root-server",
+        ]);
+    });
+
+    it("keeps two same-name mcp servers in different namespaces distinguishable", async () => {
+        await mkdir(join(rootDir, "backend/mcp/shared"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(rootDir, "backend/mcp/shared/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        await mkdir(join(rootDir, "frontend/mcp/shared"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(rootDir, "frontend/mcp/shared/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.mcp.sort()).toEqual([
+            "backend::shared",
+            "frontend::shared",
+        ]);
     });
 });

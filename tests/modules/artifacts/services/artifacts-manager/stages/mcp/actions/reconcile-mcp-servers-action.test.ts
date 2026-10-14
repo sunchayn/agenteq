@@ -43,7 +43,7 @@ describe("reconcileMcpServersAction", () => {
         });
     });
 
-    it("skips an entry that already exists", () => {
+    it("still reports written for an entry that already matched and needed no change", () => {
         const first = reconcileMcpServersAction({
             format: ConfigFileFormat.Json,
             mcp: jsonMcp,
@@ -58,7 +58,7 @@ describe("reconcileMcpServersAction", () => {
             text: first.text,
         });
 
-        expect(second.statusesByKey.get("example")).toBe("skipped");
+        expect(second.statusesByKey.get("example")).toBe("written");
     });
 
     it("removes a hand-added entry that isn't part of the canonical set", () => {

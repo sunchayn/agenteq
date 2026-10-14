@@ -1,5 +1,6 @@
 import {
     confirm,
+    groupMultiselect,
     isCancel,
     isCI,
     isTTY,
@@ -12,6 +13,7 @@ import {
  */
 export default {
     confirm: showConfirm,
+    groupMultiselect: showGroupMultiselect,
     isCancel: isCancelled,
     isInteractive: isInteractive,
     multiselect: showMultiselect,
@@ -25,6 +27,12 @@ export default {
 interface MultiselectParams {
     message: string;
     options: { value: string; label: string }[];
+    initialValues: string[];
+}
+
+interface GroupMultiselectParams {
+    message: string;
+    options: Record<string, { value: string; label: string }[]>;
     initialValues: string[];
 }
 
@@ -49,7 +57,35 @@ interface ConfirmParams {
 async function showMultiselect(
     params: MultiselectParams,
 ): Promise<string[] | symbol> {
-    return multiselect(params);
+    // clack seeds its selection straight from initialValues with no check against the options given.
+    // A stale value not currently offered must be dropped here before it ever reaches clack.
+    const offeredValues = new Set(params.options.map((option) => option.value));
+
+    return multiselect({
+        ...params,
+        initialValues: params.initialValues.filter((value) =>
+            offeredValues.has(value),
+        ),
+    });
+}
+
+async function showGroupMultiselect(
+    params: GroupMultiselectParams,
+): Promise<string[] | symbol> {
+    // clack seeds its selection straight from initialValues with no check against the options given.
+    // A stale value not currently offered must be dropped here before it ever reaches clack.
+    const offeredValues = new Set(
+        Object.values(params.options)
+            .flat()
+            .map((option) => option.value),
+    );
+
+    return groupMultiselect({
+        ...params,
+        initialValues: params.initialValues.filter((value) =>
+            offeredValues.has(value),
+        ),
+    });
 }
 
 async function showText(params: TextParams): Promise<string | symbol> {
