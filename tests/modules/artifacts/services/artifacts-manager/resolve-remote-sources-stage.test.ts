@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -221,6 +221,74 @@ describe("resolveRemoteSourcesStage", () => {
         expect(result.remoteSourceWarnings).toHaveLength(1);
         expect(result.remoteSourceWarnings[0]).toContain("Could not pull");
         expect(result.remoteSources[0]?.rootDir).toBe(clonePath);
+    });
+});
+
+describe("resolveRemoteSourcesStage pinned remotes", () => {
+    let originDir: string;
+    let clonePath: string;
+
+    function tagGuidelines(content: string, tag: string): void {
+        runGit(originDir, ["add", "GUIDELINES.md"]);
+        runGit(originDir, ["commit", "--quiet", "-m", content]);
+        runGit(originDir, ["tag", tag]);
+    }
+
+    beforeEach(async () => {
+        originDir = await mkdtemp(join(tmpdir(), "agenteq-remote-origin-"));
+        clonePath = join(cwd, "clone");
+
+        initOriginRepo(originDir);
+        await writeFile(join(originDir, "GUIDELINES.md"), "v1");
+        tagGuidelines("v1", "v1.0.0");
+        await writeFile(join(originDir, "GUIDELINES.md"), "v2");
+        tagGuidelines("v2", "v1.1.0");
+
+        await saveRemoteClonePathAction({
+            context: context,
+            name: "team",
+            path: clonePath,
+        });
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("checks out the pinned tag and never pulls the branch", async () => {
+        await saveRemoteSourcesFileAction({
+            context: context,
+            remotes: {
+                team: { ref: "v1.0.0", selection: selection, url: originDir },
+            },
+            shouldIgnore: false,
+        });
+
+        const result = await resolveRemoteSourcesStage(payload());
+
+        expect(await readFile(join(clonePath, "GUIDELINES.md"), "utf8")).toBe(
+            "v1",
+        );
+
+        expect(
+            result.remoteSourceWarnings.some((warning) =>
+                warning.includes("is pinned to"),
+            ),
+        ).toBe(true);
+    });
+
+    it("warns nothing when already pinned to the newest tag", async () => {
+        await saveRemoteSourcesFileAction({
+            context: context,
+            remotes: {
+                team: { ref: "v1.1.0", selection: selection, url: originDir },
+            },
+            shouldIgnore: false,
+        });
+
+        const result = await resolveRemoteSourcesStage(payload());
+
+        expect(result.remoteSourceWarnings).toEqual([]);
     });
 });
 

@@ -83,6 +83,7 @@ export default class RemoteSourcesFile {
 export interface RemoteSourceEntry {
     url: string;
     selection: RemoteSourceSelection;
+    ref?: string;
 }
 
 export interface RemoteSourceSelection {
@@ -104,6 +105,7 @@ const remoteSourceSelectionSchema = z.object({
 });
 
 const remoteSourceEntrySchema = z.object({
+    ref: z.string().optional(),
     selection: remoteSourceSelectionSchema,
     url: z.string(),
 });

@@ -112,6 +112,34 @@ describe("RemoteSourcesFile#serialize", () => {
     });
 });
 
+describe("RemoteSourcesFile ref", () => {
+    it("parses and round-trips a pinned ref", () => {
+        const pinnedEntry = { ...teamEntry, ref: "v1.0.0" };
+
+        const parsed = RemoteSourcesFile.parse(
+            JSON.stringify({ remotes: { team: pinnedEntry } }),
+        );
+
+        expect(parsed.get("team")).toEqual(pinnedEntry);
+
+        const serialized = new RemoteSourcesFile({
+            team: pinnedEntry,
+        }).serialize();
+
+        expect(RemoteSourcesFile.parse(serialized).get("team")).toEqual(
+            pinnedEntry,
+        );
+    });
+
+    it("leaves ref unset when it was never saved", () => {
+        const parsed = RemoteSourcesFile.parse(
+            JSON.stringify({ remotes: { team: teamEntry } }),
+        );
+
+        expect(parsed.get("team")?.ref).toBeUndefined();
+    });
+});
+
 describe("RemoteSourcesFile legacy clonePath", () => {
     it("drops a clonePath saved by an older version", () => {
         const parsed = RemoteSourcesFile.parse(

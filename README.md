@@ -99,6 +99,8 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 > [!TIP]
 > You can add `agenteq sync` to a git hook, running it whenever changes to the canonical source directory (`.ai` by default) are detected.
 
+The `sync` command also takes `--update-pins` (env: `AGENTEQ_UPDATE_PINS`), which re-pins every pinned remote source to its newest release before syncing. See [pinning a remote source to a release](#pinning-a-remote-source-to-a-release).
+
 ### Options shared by `init` and `sync`
 
 | Flag                                      | What it does                                                                                                                                                                                                                   |
@@ -173,21 +175,40 @@ flowchart LR
 npx agenteq remote-source add <name> <git-url>    # clone it, pick what to sync, attach it to Agenteq
 npx agenteq remote-source list                    # list every configured remote source
 npx agenteq remote-source update-choices <name>   # change what you previously picked from
+npx agenteq remote-source pin <name> [tag]        # pin to a release tag, the newest one when omitted
+npx agenteq remote-source unpin <name>            # go back to tracking the default branch
 npx agenteq remote-source remove <name>           # deattach it from Agenteq
 ```
 
-| Flag                 | Applies to                                | What it does                                                                                            |
-| -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--path <dir>`       | `add`                                     | Where to clone the repository on this machine, skips the location prompt.                               |
-| `--ignored`          | `add`                                     | Keep the saved configuration out of git, personal to this machine, instead of shared with the project.  |
-| `--yes`              | `add`                                     | Run non-interactively; everything found is selected instead of opening the picker (env: `AGENTEQ_YES`). |
-| `--json`             | `add`, `list`, `update-choices`, `remove` | Print machine-readable JSON instead of text or a table (env: `AGENTEQ_JSON`).                           |
-| `--source-dir <dir>` | `add`, `list`, `update-choices`, `remove` | Canonical source directory (env: `AGENTEQ_SOURCE_DIR`, default: `.ai`).                                 |
+| Flag                 | Applies to                                                | What it does                                                                                            |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `--path <dir>`       | `add`                                                     | Where to clone the repository on this machine, skips the location prompt.                               |
+| `--ignored`          | `add`                                                     | Keep the saved configuration out of git, personal to this machine, instead of shared with the project.  |
+| `--pin [tag]`        | `add`                                                     | Pin to a release tag instead of tracking the default branch, the newest tag when none is given.         |
+| `--yes`              | `add`                                                     | Run non-interactively; everything found is selected instead of opening the picker (env: `AGENTEQ_YES`). |
+| `--json`             | `add`, `list`, `update-choices`, `pin`, `unpin`, `remove` | Print machine-readable JSON instead of text or a table (env: `AGENTEQ_JSON`).                           |
+| `--source-dir <dir>` | `add`, `list`, `update-choices`, `pin`, `unpin`, `remove` | Canonical source directory (env: `AGENTEQ_SOURCE_DIR`, default: `.ai`).                                 |
 
 > [!NOTE]
 > `update-choices` always needs an interactive terminal for its picker.
 
 The clone location is personal to each machine. It is saved in `<source-dir>/agenteq.json`, which is not shared through git, and never in `remote-sources.json`. Someone who pulls your `remote-sources.json` is asked where to clone each remote the first time they run `npx agenteq sync`. With `--yes` or in CI, the default `~/.agenteq/sources/<name>` is used.
+
+#### Pinning a remote source to a release
+
+By default, a remote source always tracks its default branch, so every sync pulls the latest content. Pin it to a release tag instead when you want predictable, reviewed updates:
+
+```bash
+npx agenteq remote-source add my-org git@github.com:org/team.git --pin        # pin to the newest tag
+npx agenteq remote-source pin my-org v1.2.0                                   # pin an existing remote to an exact tag
+npx agenteq remote-source unpin my-org                                        # go back to tracking the branch
+```
+
+Once pinned, `npx agenteq sync` never pulls past that tag on its own. If a newer tag exists, sync prints a warning instead of using it. Pass `--update-pins` to re-pin every pinned remote to its newest release before syncing:
+
+```bash
+npx agenteq sync --update-pins   # env: AGENTEQ_UPDATE_PINS
+```
 
 ### Consolidating drifted repos into one remote source
 
@@ -265,6 +286,10 @@ If a command fails, the error message starts with a code in parentheses, for exa
 | `E_REMOTE_SOURCE_NOT_CONFIGURED`     | The `remote-source update-choices <name>` was run with no remote source saved under that name. Run `remote-source add <name> <git-url>` first.                                                                           |
 | `E_REMOTE_SOURCE_NEEDS_PROMPT`       | The `remote-source update-choices` needs an interactive terminal for its picker, it cannot run with `--yes` or in CI.                                                                                                    |
 | `E_REMOTE_SOURCE_CANCELLED`          | The picker prompt in `remote-source add`/`update-choices` was cancelled.                                                                                                                                                 |
+| `E_REMOTE_SOURCE_NO_TAGS`            | `--pin` or `remote-source pin` was used on a remote with no tags to pin to.                                                                                                                                              |
+| `E_REMOTE_SOURCE_TAG_NOT_FOUND`      | The tag given to `--pin` or `remote-source pin` does not exist on that remote.                                                                                                                                           |
+| `E_REMOTE_SOURCE_CHECKOUT_FAILED`    | `remote-source pin` could not check out the resolved tag, see the printed detail for the underlying git error.                                                                                                           |
+| `E_REMOTE_SOURCE_NO_DEFAULT_BRANCH`  | `remote-source unpin` could not determine the remote's default branch from its clone.                                                                                                                                    |
 
 ### MCP config
 

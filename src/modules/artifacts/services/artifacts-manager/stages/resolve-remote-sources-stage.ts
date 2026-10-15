@@ -71,38 +71,82 @@ async function resolveOneRemote(
     entry: RemoteSourceEntry,
     clonePath: string,
 ): Promise<ResolveOneRemoteResult> {
-    const { selection, url } = entry;
+    const { ref, selection, url } = entry;
 
     const hasExistingClone = await filesystem.exists(clonePath);
 
-    const result = hasExistingClone
-        ? await git.pull({ cwd: clonePath })
-        : await git.clone({ targetDir: clonePath, url: url });
+    if (!hasExistingClone) {
+        const cloneResult = await git.clone({ targetDir: clonePath, url: url });
 
-    if (!result.isSuccessful) {
-        if (!hasExistingClone) {
+        if (!cloneResult.isSuccessful) {
             return {
-                warning: `Could not clone the remote source "${pc.bold(name)}" at ${pc.bold(url)}, skipping it this run.${formatErrorDetails(result.detail)}`,
+                warning: `Could not clone the remote source "${pc.bold(name)}" at ${pc.bold(url)}, skipping it this run.${formatErrorDetails(cloneResult.detail)}`,
             };
         }
+    }
 
+    const outcome = {
+        name: name,
+        rootDir: clonePath,
+        selection: selection,
+        url: url,
+    };
+
+    if (ref) {
+        return resolvePinnedRemote(name, clonePath, ref, outcome);
+    }
+
+    if (!hasExistingClone) {
+        return { outcome: outcome };
+    }
+
+    const pullResult = await git.pull({ cwd: clonePath });
+
+    if (!pullResult.isSuccessful) {
         return {
-            outcome: {
-                name: name,
-                rootDir: clonePath,
-                selection: selection,
-                url: url,
-            },
-            warning: `Could not pull the remote source "${pc.bold(name)}" at ${pc.bold(clonePath)}, using its last-synced state.${formatErrorDetails(result.detail)}`,
+            outcome: outcome,
+            warning: `Could not pull the remote source "${pc.bold(name)}" at ${pc.bold(clonePath)}, using its last-synced state.${formatErrorDetails(pullResult.detail)}`,
         };
     }
 
-    return {
-        outcome: {
-            name: name,
-            rootDir: clonePath,
-            selection: selection,
-            url: url,
-        },
-    };
+    return { outcome: outcome };
+}
+
+/**
+ * Resolves a remote pinned to a git tag, warns out when newer tags are available.
+ */
+async function resolvePinnedRemote(
+    name: string,
+    clonePath: string,
+    ref: string,
+    outcome: ResolvedRemoteSource,
+): Promise<ResolveOneRemoteResult> {
+    const fetchResult = await git.fetchTags({ cwd: clonePath });
+
+    if (!fetchResult.isSuccessful) {
+        return {
+            outcome: outcome,
+            warning: `Could not fetch tags for the remote source "${pc.bold(name)}", using its last-synced state.${formatErrorDetails(fetchResult.detail)}`,
+        };
+    }
+
+    const checkoutResult = await git.checkoutTag({ cwd: clonePath, tag: ref });
+
+    if (!checkoutResult.isSuccessful) {
+        return {
+            outcome: outcome,
+            warning: `Could not check out the pinned tag "${pc.bold(ref)}" for the remote source "${pc.bold(name)}", using its last-synced state.${formatErrorDetails(checkoutResult.detail)}`,
+        };
+    }
+
+    const newest = git.listTags({ cwd: clonePath })[0];
+
+    if (newest && newest !== ref) {
+        return {
+            outcome: outcome,
+            warning: `Remote source "${pc.bold(name)}" is pinned to ${pc.bold(ref)}. A newer version ${pc.bold(newest)} is available. Run \`agenteq sync --update-pins\` to update.`,
+        };
+    }
+
+    return { outcome: outcome };
 }

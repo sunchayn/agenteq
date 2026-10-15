@@ -9,6 +9,7 @@ const ENV_KEYS = [
     "AGENTEQ_JSON",
     "AGENTEQ_SOURCE_DIR",
     "AGENTEQ_SKIP_IN_CI",
+    "AGENTEQ_UPDATE_PINS",
 ];
 
 afterEach(() => {
@@ -82,5 +83,25 @@ describe("resolveCommonSyncOptions", () => {
         const resolved = resolveCommonSyncOptions({ sourceDir: "custom/ai" });
 
         expect(resolved.sourceDir).toBe("custom/ai");
+    });
+
+    it("defaults shouldUpdatePins to false with nothing set", () => {
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.shouldUpdatePins).toBe(false);
+    });
+
+    it("--update-pins takes precedence over AGENTEQ_UPDATE_PINS", () => {
+        process.env.AGENTEQ_UPDATE_PINS = "";
+        const resolved = resolveCommonSyncOptions({ updatePins: true });
+
+        expect(resolved.shouldUpdatePins).toBe(true);
+    });
+
+    it("falls back to AGENTEQ_UPDATE_PINS when --update-pins is absent", () => {
+        process.env.AGENTEQ_UPDATE_PINS = "1";
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.shouldUpdatePins).toBe(true);
     });
 });

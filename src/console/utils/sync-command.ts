@@ -18,6 +18,8 @@ export function resolveCommonSyncOptions(
         only: options.only ?? env.readString("AGENTEQ_ONLY"),
         shouldSkipInCi: options.skipInCi ?? env.readFlag("AGENTEQ_SKIP_IN_CI"),
         shouldSkipPrompts: options.yes ?? env.readFlag("AGENTEQ_YES"),
+        shouldUpdatePins:
+            options.updatePins ?? env.readFlag("AGENTEQ_UPDATE_PINS"),
         sourceDir:
             options.sourceDir ??
             env.readString("AGENTEQ_SOURCE_DIR") ??
@@ -31,11 +33,12 @@ export function resolveCommonSyncOptions(
 
 export type ResolvedSyncOptions = Omit<
     RawSyncOptions,
-    "agents" | "json" | "yes" | "skipInCi"
+    "agents" | "json" | "yes" | "skipInCi" | "updatePins"
 > & {
     agents: string[];
     isJson: boolean;
     shouldSkipInCi: boolean;
     shouldSkipPrompts: boolean;
+    shouldUpdatePins: boolean;
     sourceDir: string;
 };

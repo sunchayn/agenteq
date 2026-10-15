@@ -50,6 +50,10 @@ export function registerSyncCommand(program: Command): void {
             "--skip-in-ci",
             "do nothing when run in a CI environment (env: AGENTEQ_SKIP_IN_CI)",
         )
+        .option(
+            "--update-pins",
+            "re-pin every pinned remote source to its newest release before syncing (env: AGENTEQ_UPDATE_PINS)",
+        )
         .action(async (rawOptions: RawSyncOptions) => {
             const options = resolveCommonSyncOptions(rawOptions);
 
@@ -131,8 +135,9 @@ export function registerSyncCommand(program: Command): void {
                 capabilities: capabilities,
                 context: context,
                 isJson: options.isJson,
-                shouldSkipPrompts: options.shouldSkipPrompts,
                 label: "agenteq sync",
+                shouldSkipPrompts: options.shouldSkipPrompts,
+                shouldUpdatePins: options.shouldUpdatePins,
             });
 
             process.exitCode = hasFailed ? 1 : 0;
