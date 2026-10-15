@@ -20,6 +20,7 @@ import discoverRemoteCapabilitiesAction, {
     type RemoteCapabilities,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import RemoteSourcesFile, {
+    type RemoteSourceEntry,
     type RemoteSourceSelection,
 } from "@artifacts/entities/remote-sources-file.js";
 import { promptForClonePath } from "@console/actions/concerns/prompt-for-clone-path.js";
@@ -48,6 +49,10 @@ export function registerRemoteSourceCommand(program: Command): void {
         .option(
             "--ignored",
             "keep the saved configuration out of git, personal to this machine",
+        )
+        .option(
+            "--pin [tag]",
+            "pin to a release tag instead of tracking the default branch, newest tag when none is given",
         )
         .option("--yes", "run non-interactively (env: AGENTEQ_YES)")
         .option(
@@ -89,6 +94,36 @@ export function registerRemoteSourceCommand(program: Command): void {
         .action(runUpdateChoices);
 
     remoteSourceCommand
+        .command("pin <name> [tag]")
+        .description(
+            "Pin a remote source to a release tag, the newest one when tag is omitted",
+        )
+        .option(
+            "--json",
+            "print machine-readable JSON instead of text (env: AGENTEQ_JSON)",
+        )
+        .option(
+            "--source-dir <dir>",
+            `canonical source directory within the current repository (env: AGENTEQ_SOURCE_DIR, default: ${artifactsManager.DEFAULT_SOURCE_DIR})`,
+        )
+        .action(runPin);
+
+    remoteSourceCommand
+        .command("unpin <name>")
+        .description(
+            "Stop pinning a remote source, go back to tracking its default branch",
+        )
+        .option(
+            "--json",
+            "print machine-readable JSON instead of text (env: AGENTEQ_JSON)",
+        )
+        .option(
+            "--source-dir <dir>",
+            `canonical source directory within the current repository (env: AGENTEQ_SOURCE_DIR, default: ${artifactsManager.DEFAULT_SOURCE_DIR})`,
+        )
+        .action(runUnpin);
+
+    remoteSourceCommand
         .command("remove <name>")
         .description("Delete one named remote source's saved configuration")
         .option(
@@ -106,9 +141,30 @@ export function registerRemoteSourceCommand(program: Command): void {
  * Interface & Types.
  */
 
+/**
+ * Marks a `--pin` with no tag given, pin the newest one instead of a specific one.
+ */
+const LATEST_TAG = Symbol("latest tag");
+
+/**
+ * Marks "don't pin at all", keep tracking the default branch.
+ */
+const HEAD = Symbol("HEAD");
+
+/**
+ * What a `--pin` request resolves to, once `parsePinFlag` reads a `RawPinFlag`.
+ */
+type PinFlag = typeof LATEST_TAG | typeof HEAD | string;
+
+/**
+ * Commander's raw shape for `--pin [tag]`, before `parsePinFlag` turns it into a `PinFlag`.
+ */
+type RawPinFlag = true | string | undefined;
+
 interface AddOptions {
     path?: string;
     ignored?: boolean;
+    pin?: RawPinFlag;
     yes?: boolean;
     json?: boolean;
     sourceDir?: string;
@@ -155,6 +211,12 @@ async function runAdd(
 
     await resolveOrCloneRepo({ clonePath: clonePath, gitUrl: gitUrl });
 
+    const ref = await resolvePinOption(
+        parsePinFlag(rawOptions.pin),
+        clonePath,
+        name,
+    );
+
     const capabilities = await discoverRemoteCapabilitiesAction({
         rootDir: clonePath,
     });
@@ -166,6 +228,7 @@ async function runAdd(
         : selectEverything(capabilities);
 
     const updated = file.withRemote(name, {
+        ref: ref,
         selection: selection,
         url: gitUrl,
     });
@@ -228,13 +291,14 @@ async function runList(rawOptions: RemoteSourceOptions): Promise<void> {
     }
 
     output.table(
-        ["Name", "URL", "Clone path"],
+        ["Name", "URL", "Pinned", "Clone path"],
         file.names().map((name) => {
             const entry = file.get(name);
 
             return [
                 name,
                 entry?.url ?? "",
+                entry?.ref ?? "tracking",
                 agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name),
             ];
         }),
@@ -251,12 +315,7 @@ async function runUpdateChoices(
     const file = await loadRemoteSourcesFileAction({ context: context });
     const entry = file.get(name);
 
-    if (!entry) {
-        throw new CliError(
-            "E_REMOTE_SOURCE_NOT_CONFIGURED",
-            `No remote source named "${pc.bold(name)}" is configured. Run \`npx agenteq remote-source add ${name} <git-url>\` first.`,
-        );
-    }
+    assertRemoteConfigured(entry, name);
 
     if (!(input.isInteractive() && !options.shouldSkipPrompts)) {
         throw new CliError(
@@ -270,7 +329,12 @@ async function runUpdateChoices(
     const clonePath =
         agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
 
-    await git.pull({ cwd: clonePath });
+    if (entry.ref) {
+        await git.fetchTags({ cwd: clonePath });
+        await git.checkoutTag({ cwd: clonePath, tag: entry.ref });
+    } else {
+        await git.pull({ cwd: clonePath });
+    }
 
     const capabilities = await discoverRemoteCapabilitiesAction({
         rootDir: clonePath,
@@ -279,6 +343,7 @@ async function runUpdateChoices(
     const selection = await promptForSelection(capabilities, entry.selection);
 
     const updated = file.withRemote(name, {
+        ref: entry.ref,
         selection: selection,
         url: entry.url,
     });
@@ -343,6 +408,175 @@ async function runRemove(
         level: "info",
         message: `Removed remote source "${pc.bold(name)}". The clone at ${pc.bold(clonePath)} was left in place, delete it yourself if you no longer need it.`,
     });
+}
+
+async function runPin(
+    name: string,
+    tag: string | undefined,
+    rawOptions: RemoteSourceOptions,
+): Promise<void> {
+    const options = resolveOptions(rawOptions);
+    const context = { cwd: process.cwd(), sourceDir: options.sourceDir };
+
+    const file = await loadRemoteSourcesFileAction({ context: context });
+    const entry = file.get(name);
+
+    assertRemoteConfigured(entry, name);
+
+    const agentsFile = await loadAgentsFileAction({ context: context });
+
+    const clonePath =
+        agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
+
+    const ref = await resolveTagToPinOn(tag ?? LATEST_TAG, clonePath, name);
+
+    const checkoutResult = await git.checkoutTag({ cwd: clonePath, tag: ref });
+
+    if (!checkoutResult.isSuccessful) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_CHECKOUT_FAILED",
+            `Could not check out tag "${pc.bold(ref)}" for "${pc.bold(name)}".${formatErrorDetails(checkoutResult.detail)}`,
+        );
+    }
+
+    const updated = file.withRemote(name, { ...entry, ref: ref });
+
+    await saveRemoteSourcesFileAction({
+        context: context,
+        remotes: updated.remotes,
+        shouldIgnore: false,
+    });
+
+    printMessage({
+        isJson: options.isJson,
+        level: "info",
+        message: `Pinned remote source "${pc.bold(name)}" to ${pc.bold(ref)}.`,
+    });
+}
+
+async function runUnpin(
+    name: string,
+    rawOptions: RemoteSourceOptions,
+): Promise<void> {
+    const options = resolveOptions(rawOptions);
+    const context = { cwd: process.cwd(), sourceDir: options.sourceDir };
+
+    const file = await loadRemoteSourcesFileAction({ context: context });
+    const entry = file.get(name);
+
+    assertRemoteConfigured(entry, name);
+
+    if (!entry.ref) {
+        printMessage({
+            isJson: options.isJson,
+            level: "info",
+            message: `Remote source "${pc.bold(name)}" is not pinned.`,
+        });
+
+        return;
+    }
+
+    const agentsFile = await loadAgentsFileAction({ context: context });
+
+    const clonePath =
+        agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
+
+    const branch = git.defaultBranch({ cwd: clonePath });
+
+    if (!branch) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_NO_DEFAULT_BRANCH",
+            `Could not determine the default branch for "${pc.bold(name)}" at ${pc.bold(clonePath)}.`,
+        );
+    }
+
+    await git.checkoutBranch({ branch: branch, cwd: clonePath });
+    await git.pull({ cwd: clonePath });
+
+    const updated = file.withRemote(name, {
+        selection: entry.selection,
+        url: entry.url,
+    });
+
+    await saveRemoteSourcesFileAction({
+        context: context,
+        remotes: updated.remotes,
+        shouldIgnore: false,
+    });
+
+    printMessage({
+        isJson: options.isJson,
+        level: "info",
+        message: `Unpinned remote source "${pc.bold(name)}", tracking "${pc.bold(branch)}" again.`,
+    });
+}
+
+function assertRemoteConfigured(
+    entry: RemoteSourceEntry | undefined,
+    name: string,
+): asserts entry is RemoteSourceEntry {
+    if (!entry) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_NOT_CONFIGURED",
+            `No remote source named "${pc.bold(name)}" is configured. Run \`npx agenteq remote-source add ${name} <git-url>\` first.`,
+        );
+    }
+}
+
+/**
+ * Turns commander's raw `--pin [tag]` value into a `PinFlag`.
+ */
+function parsePinFlag(raw: RawPinFlag): PinFlag {
+    if (raw === undefined) {
+        return HEAD;
+    }
+
+    return raw === true ? LATEST_TAG : raw;
+}
+
+/**
+ * Resolves a requested `--pin` option into a concrete tag, undefined when no pin was requested at all.
+ */
+async function resolvePinOption(
+    pin: PinFlag,
+    clonePath: string,
+    name: string,
+): Promise<string | undefined> {
+    return pin === HEAD ? undefined : resolveTagToPinOn(pin, clonePath, name);
+}
+
+/**
+ * Fetches tags and resolves them to a concrete tag to pin on.
+ * Pass `LATEST_TAG` to resolve to the newest one instead of naming an exact tag.
+ */
+async function resolveTagToPinOn(
+    tag: string | typeof LATEST_TAG,
+    clonePath: string,
+    name: string,
+): Promise<string> {
+    await git.fetchTags({ cwd: clonePath });
+
+    const tags = git.listTags({ cwd: clonePath });
+
+    if (tags.length === 0) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_NO_TAGS",
+            `"${pc.bold(name)}" has no tags to pin to.`,
+        );
+    }
+
+    if (tag === LATEST_TAG) {
+        return tags[0];
+    }
+
+    if (!tags.includes(tag)) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_TAG_NOT_FOUND",
+            `Tag "${pc.bold(tag)}" was not found for "${pc.bold(name)}". Available tags, ${tags.join(", ")}.`,
+        );
+    }
+
+    return tag;
 }
 
 function resolveOptions(

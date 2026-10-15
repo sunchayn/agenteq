@@ -223,3 +223,95 @@ describe("git.clone / git.pull / git.remoteUrl", () => {
         expect(git.remoteUrl({ cwd: cwd })).toBeUndefined();
     });
 });
+
+describe("git.fetchTags / git.listTags / git.checkoutTag / git.currentTag", () => {
+    let originDir: string;
+    let targetDir: string;
+
+    beforeEach(async () => {
+        originDir = await mkdtemp(join(tmpdir(), "agenteq-git-tags-origin-"));
+        targetDir = join(cwd, "clone");
+        initRepo(originDir);
+        await commitFile(originDir, "GUIDELINES.md", "hello");
+        runGit(originDir, ["tag", "v1.0.0"]);
+        await commitFile(originDir, "second.md", "world");
+        runGit(originDir, ["tag", "v1.1.0"]);
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("lists tags newest first after cloning", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+
+        expect(git.listTags({ cwd: targetDir })).toEqual(["v1.1.0", "v1.0.0"]);
+    });
+
+    it("fetches a new tag pushed after the clone was made", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+        await commitFile(originDir, "third.md", "again");
+        runGit(originDir, ["tag", "v1.2.0"]);
+
+        const result = await git.fetchTags({ cwd: targetDir });
+
+        expect(result.isSuccessful).toBe(true);
+        expect(git.listTags({ cwd: targetDir })).toEqual([
+            "v1.2.0",
+            "v1.1.0",
+            "v1.0.0",
+        ]);
+    });
+
+    it("checks out an older tag, detached from the branch", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+
+        const result = await git.checkoutTag({ cwd: targetDir, tag: "v1.0.0" });
+
+        expect(result.isSuccessful).toBe(true);
+        expect(git.currentTag({ cwd: targetDir })).toBe("v1.0.0");
+    });
+
+    it("reports no current tag right after cloning, between releases", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+        runGit(targetDir, ["config", "user.email", "test@example.com"]);
+        runGit(targetDir, ["config", "user.name", "Test"]);
+        await commitFile(targetDir, "local.md", "untagged");
+
+        expect(git.currentTag({ cwd: targetDir })).toBeUndefined();
+    });
+});
+
+describe("git.defaultBranch / git.checkoutBranch", () => {
+    let originDir: string;
+    let targetDir: string;
+
+    beforeEach(async () => {
+        originDir = await mkdtemp(join(tmpdir(), "agenteq-git-branch-origin-"));
+        targetDir = join(cwd, "clone");
+        initRepo(originDir);
+        await commitFile(originDir, "GUIDELINES.md", "hello");
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("reads the default branch recorded by a clone", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+
+        const branch = git.defaultBranch({ cwd: targetDir });
+
+        const result = await git.checkoutBranch({
+            branch: branch ?? "",
+            cwd: targetDir,
+        });
+
+        expect(branch).toBeTruthy();
+        expect(result.isSuccessful).toBe(true);
+    });
+
+    it("returns undefined when the directory has no origin remote", () => {
+        expect(git.defaultBranch({ cwd: cwd })).toBeUndefined();
+    });
+});

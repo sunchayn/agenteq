@@ -615,6 +615,211 @@ describe("agenteq remote-source add", () => {
 
         await rm(otherOrigin, { force: true, recursive: true });
     });
+
+    it("pins to the newest tag when --pin is given without a value", async () => {
+        runGit(originDir, ["tag", "v1.0.0"]);
+        await commit(originDir, "second.md", "more");
+        runGit(originDir, ["tag", "v1.1.0"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--yes",
+            "--pin",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.ref).toBe("v1.1.0");
+    });
+
+    it("pins to the exact tag given to --pin", async () => {
+        runGit(originDir, ["tag", "v1.0.0"]);
+        await commit(originDir, "second.md", "more");
+        runGit(originDir, ["tag", "v1.1.0"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--yes",
+            "--pin",
+            "v1.0.0",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.ref).toBe("v1.0.0");
+    });
+
+    it("throws a trackable CliError when the requested tag does not exist", async () => {
+        runGit(originDir, ["tag", "v1.0.0"]);
+
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add",
+                "team",
+                originDir,
+                "--yes",
+                "--pin",
+                "v9.9.9",
+                "--path",
+                join(cwd, "clone"),
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_TAG_NOT_FOUND" });
+    });
+
+    it("throws a trackable CliError when --pin is given but the source has no tags", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add",
+                "team",
+                originDir,
+                "--yes",
+                "--pin",
+                "--path",
+                join(cwd, "clone"),
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_NO_TAGS" });
+    });
+});
+
+describe("agenteq remote-source pin / unpin", () => {
+    let originDir: string;
+    let clonePath: string;
+
+    beforeEach(async () => {
+        originDir = await createOrigin();
+        clonePath = join(cwd, "clone");
+
+        await commit(originDir, "GUIDELINES.md", "v1");
+        runGit(originDir, ["tag", "v1.0.0"]);
+        await commit(originDir, "second.md", "v2");
+        runGit(originDir, ["tag", "v1.1.0"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--yes",
+            "--path",
+            clonePath,
+        ]);
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("pins an already-added remote to the newest tag by default", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "pin",
+            "team",
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.ref).toBe("v1.1.0");
+        expect(git.currentTag({ cwd: clonePath })).toBe("v1.1.0");
+    });
+
+    it("pins to an exact tag when one is given", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "pin",
+            "team",
+            "v1.0.0",
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.ref).toBe("v1.0.0");
+        expect(git.currentTag({ cwd: clonePath })).toBe("v1.0.0");
+    });
+
+    it("throws a trackable CliError when the remote isn't configured", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "pin",
+                "unknown",
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_NOT_CONFIGURED" });
+    });
+
+    it("goes back to tracking the default branch on unpin", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "pin",
+            "team",
+            "v1.0.0",
+        ]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "unpin",
+            "team",
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.ref).toBeUndefined();
+        expect(await readFile(join(clonePath, "second.md"), "utf8")).toBe("v2");
+    });
+
+    it("prints a notice and does nothing when the remote is not pinned", async () => {
+        const writeSpy = vi
+            .spyOn(process.stdout, "write")
+            .mockImplementation(() => true);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "unpin",
+            "team",
+            "--json",
+        ]);
+
+        const payload = JSON.parse(
+            writeSpy.mock.calls.map(([chunk]) => String(chunk)).join(""),
+        ) as { message: string };
+
+        expect(payload.message).toContain("is not pinned");
+
+        writeSpy.mockRestore();
+    });
 });
 
 describe("agenteq remote-source list", () => {

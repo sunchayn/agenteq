@@ -288,6 +288,33 @@ describe("agenteq sync: auto-detection", () => {
 
         expect(process.exitCode).toBe(1);
     });
+
+    it("forwards --update-pins to syncArtifactsAction", async () => {
+        await saveAgentsFileAction({
+            agentNames: ["claude_code"],
+            capabilities: Object.values(AgentCapability),
+            context: context,
+        });
+
+        const syncSpy = vi
+            .spyOn(syncArtifactsActionModule, "default")
+            .mockResolvedValue(false);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--yes",
+            "--json",
+            "--update-pins",
+        ]);
+
+        expect(syncSpy).toHaveBeenCalledWith(
+            expect.objectContaining({ shouldUpdatePins: true }),
+        );
+
+        syncSpy.mockRestore();
+    });
 });
 
 describe("agenteq sync: --skip-in-ci", () => {

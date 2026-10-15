@@ -31,6 +31,19 @@ export class SyncOutcome {
             (capability) => !this.requestedCapabilities.includes(capability),
         );
     }
+
+    /**
+     * Returns a new outcome with its remote source warnings replaced, everything else kept as-is.
+     */
+    withRemoteSourceWarnings(remoteSourceWarnings: string[]): SyncOutcome {
+        return new SyncOutcome({
+            gitignoreAlerts: this.gitignoreAlerts,
+            remoteSourceWarnings: remoteSourceWarnings,
+            requestedCapabilities: this.requestedCapabilities,
+            results: this.results,
+            sourceDir: this.sourceDir,
+        });
+    }
 }
 
 /*

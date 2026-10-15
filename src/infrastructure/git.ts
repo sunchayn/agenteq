@@ -6,8 +6,14 @@ import { join } from "node:path";
  * A standardized service for git operations.
  */
 const git = {
+    checkoutBranch: checkoutBranch,
+    checkoutTag: checkoutTag,
     clone: clone,
+    currentTag: currentTag,
+    defaultBranch: defaultBranch,
+    fetchTags: fetchTags,
     ignore: ignore,
+    listTags: listTags,
     pull: pull,
     remoteUrl: remoteUrl,
     trackedPaths: trackedPaths,
@@ -40,6 +46,32 @@ interface PullOptions {
 
 interface RemoteUrlOptions {
     cwd: string;
+}
+
+interface FetchTagsOptions {
+    cwd: string;
+}
+
+interface ListTagsOptions {
+    cwd: string;
+}
+
+interface CheckoutTagOptions {
+    cwd: string;
+    tag: string;
+}
+
+interface CurrentTagOptions {
+    cwd: string;
+}
+
+interface DefaultBranchOptions {
+    cwd: string;
+}
+
+interface CheckoutBranchOptions {
+    cwd: string;
+    branch: string;
 }
 
 interface GitCommandResult {
@@ -114,6 +146,86 @@ function remoteUrl(options: RemoteUrlOptions): string | undefined {
     });
 
     return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+/**
+ * Fetches every tag from origin.
+ */
+async function fetchTags(options: FetchTagsOptions): Promise<GitCommandResult> {
+    const { cwd } = options;
+
+    return runGitAsync(["fetch", "--tags", "--force"], cwd);
+}
+
+/**
+ * Lists every local tag, newest release first.
+ */
+function listTags(options: ListTagsOptions): string[] {
+    const { cwd } = options;
+
+    const result = spawnSync("git", ["tag", "--sort=-v:refname"], {
+        cwd: cwd,
+        encoding: "utf8",
+    });
+
+    if (result.status !== 0 || !result.stdout) {
+        return [];
+    }
+
+    return result.stdout.split("\n").filter(Boolean);
+}
+
+/**
+ * Checks out a tag directly, detached from any branch.
+ */
+async function checkoutTag(
+    options: CheckoutTagOptions,
+): Promise<GitCommandResult> {
+    const { cwd, tag } = options;
+
+    return runGitAsync(["checkout", "--detach", `tags/${tag}`], cwd);
+}
+
+/**
+ * Returns the tag HEAD currently points at, or undefined when it isn't on one.
+ */
+function currentTag(options: CurrentTagOptions): string | undefined {
+    const { cwd } = options;
+
+    const result = spawnSync("git", ["describe", "--tags", "--exact-match"], {
+        cwd: cwd,
+        encoding: "utf8",
+    });
+
+    return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+/**
+ * Returns the name of origin's default branch.
+ */
+function defaultBranch(options: DefaultBranchOptions): string | undefined {
+    const { cwd } = options;
+
+    const result = spawnSync(
+        "git",
+        ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        { cwd: cwd, encoding: "utf8" },
+    );
+
+    return result.status === 0
+        ? result.stdout.trim().replace(/^origin\//, "")
+        : undefined;
+}
+
+/**
+ * Checks out an existing branch.
+ */
+async function checkoutBranch(
+    options: CheckoutBranchOptions,
+): Promise<GitCommandResult> {
+    const { branch, cwd } = options;
+
+    return runGitAsync(["checkout", branch], cwd);
 }
 
 /**

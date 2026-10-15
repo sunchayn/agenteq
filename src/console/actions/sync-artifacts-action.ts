@@ -4,6 +4,7 @@ import type Agent from "@agents/entities/agent.js";
 import type { RunContext } from "@shared/types/run-context.js";
 import type { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import ensureRemoteClonePathsAction from "@console/actions/ensure-remote-clone-paths-action.js";
+import updateRemoteSourcePinsAction from "@artifacts/actions/update-remote-source-pins-action.js";
 import { printSyncOutcome } from "@console/actions/concerns/print-sync-outcome.js";
 
 /**
@@ -13,8 +14,15 @@ import { printSyncOutcome } from "@console/actions/concerns/print-sync-outcome.j
 export default async function syncArtifactsAction(
     options: RunSyncFlowOptions,
 ): Promise<boolean> {
-    const { agents, capabilities, context, isJson, label, shouldSkipPrompts } =
-        options;
+    const {
+        agents,
+        capabilities,
+        context,
+        isJson,
+        label,
+        shouldSkipPrompts,
+        shouldUpdatePins,
+    } = options;
 
     if (!isJson) {
         output.intro(label);
@@ -25,15 +33,27 @@ export default async function syncArtifactsAction(
         shouldSkipPrompts: shouldSkipPrompts,
     });
 
+    const updatePinWarnings = shouldUpdatePins
+        ? await updateRemoteSourcePinsAction({ context: context })
+        : [];
+
     const outcome = await artifactsManager.sync({
         capabilities: capabilities,
         context: context,
         selectedAgents: agents,
     });
 
+    const outcomeWithPinWarnings =
+        updatePinWarnings.length === 0
+            ? outcome
+            : outcome.withRemoteSourceWarnings([
+                  ...updatePinWarnings,
+                  ...outcome.remoteSourceWarnings,
+              ]);
+
     printSyncOutcome({
         isJson: isJson,
-        outcome: outcome,
+        outcome: outcomeWithPinWarnings,
     });
 
     return outcome.hasFailed;
@@ -50,4 +70,5 @@ interface RunSyncFlowOptions {
     isJson: boolean;
     label: string;
     shouldSkipPrompts: boolean;
+    shouldUpdatePins?: boolean;
 }
