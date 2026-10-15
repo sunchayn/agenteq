@@ -1,58 +1,57 @@
 ---
 name: refactor-to-agenteq
-
 description: Reverse-engineers a repo's scattered per-agent AI configuration (guidelines, skills, commands, MCP servers) into agenteq's canonical .ai/ source of truth, then runs a real agenteq sync and untracks the generated files from git.
 ---
 
 # Refactoring a Repo to agenteq
 
-## 1. What this produces
+## 1. End state
 
-The end state matches what `npx agenteq init` produces on a repo with no existing AI configuration.
+Same as `npx agenteq init` on a repo with no AI configuration.
 
-- A canonical source directory, default `.ai`: `GUIDELINES.md`, `mcp/<name>/config.json`, `commands/**`, `skills/**`.
-- An `agenteq.json` file recording the chosen agents and capabilities.
-- Every generated per-agent file (`CLAUDE.md`, `.cursor/skills`, `.mcp.json`, and so on) gitignored.
-- No generated file left tracked in git.
+- Canonical source directory, default `.ai`: `GUIDELINES.md`, `mcp/<name>/config.json`, `commands/**`, `skills/**`.
+- `agenteq.json` recording chosen agents and capabilities.
+- Every generated per-agent file (`CLAUDE.md`, `.cursor/skills`, `.mcp.json`, etc.) gitignored.
+- No generated file tracked in git.
 
-Nothing under the canonical source directory is generated. It is the source every agent file comes from. This skill's job is to get real, scattered content into that directory without losing any of it, then hand off to agenteq's own CLI to generate the rest.
+Nothing in the canonical source directory is generated. It is the source for every agent file. This skill moves real scattered content into it without loss, then hands off to the agenteq CLI.
 
 ## 2. Ask for the source directory
 
-Ask the user for the canonical source directory. Default: `.ai` (agenteq's `DEFAULT_SOURCE_DIR`). Use their answer for every path below.
+Ask the user. Default: `.ai` (`DEFAULT_SOURCE_DIR`). Use the answer for every path below.
 
-If that directory already has content, treat it as the current canonical state. Merge new findings into it. Do not overwrite it.
+If the directory already has content, treat it as current canonical state. Merge new findings in. Do not overwrite.
 
 ## 3. Identify the primary agent
 
-One coding agent runs this skill right now. Its files are the reverse-engineering baseline, they are the ones someone actually kept up to date.
+The agent running this skill is the baseline. Its files are the ones someone kept current.
 
-- Check for a conclusive signal first: the current harness signals, an agent-specific environment variable (for example `CLAUDECODE` for Claude Code), or a tool surface that only makes sense for one agent.
-- If no signal is conclusive, ask the user which agent is running this session.
-- Confirm the chosen agent with the user before continuing. A wrong baseline makes every later diff in step 5 wrong too.
+- Look for a conclusive signal first: harness signals, an agent-specific env var (e.g. `CLAUDECODE` for Claude Code), or a tool surface unique to one agent.
+- No conclusive signal: ask the user which agent runs this session.
+- Confirm the agent with the user before continuing. A wrong baseline makes every diff in step 5 wrong.
 
-## 4. Reverse-engineer the primary agent's files into `.ai/`
+## 4. Reverse-engineer the primary agent's files into the source directory
 
-Look up the primary agent's native paths and shapes in section 10's table. For each file or directory that exists, write its canonical equivalent. Use only content that already exists in the repo. Do not invent content.
+Look up the primary agent's paths and shapes in the section 10 table. For each existing file or directory, write its canonical equivalent. Use only content already in the repo. Do not invent content.
 
 ### 4.1 Guidelines
 
-Read the primary agent's guidelines file, the Guidelines column in the table. Write it to `<source dir>/GUIDELINES.md`.
+Read the primary agent's guidelines file (Guidelines column). Write it to `<source dir>/GUIDELINES.md`.
 
 ### 4.2 Skills
 
-If the table lists a skills directory for the primary agent, and it exists, copy each skill directory into `<source dir>/skills/`. Keep each skill's own directory name and its `SKILL.md`. Skip a symlink that points outside the repo, or into another tool's cache, that is not hand-authored content.
+If the table lists a skills directory for the primary agent and it exists, copy each skill directory into `<source dir>/skills/`, keeping directory name and `SKILL.md`. Skip a symlink pointing outside the repo or into another tool's cache. That is not hand-authored content.
 
 ### 4.3 Commands
 
-If the table lists a commands directory for the primary agent, and it exists, copy each command file into `<source dir>/commands/`. If the table shows a non-`.md` extension for that agent, rename the file back to `.md`.
+If the table lists a commands directory for the primary agent and it exists, copy each command file into `<source dir>/commands/`. If the table shows a non-`.md` extension, rename back to `.md`.
 
 ### 4.4 MCP servers
 
-If the table lists an MCP config file for the primary agent, and it exists:
+If the table lists an MCP config file for the primary agent and it exists:
 
-1. Parse it (JSON, TOML, or JSONC, per the table). Read the entries at the table's MCP key path.
-2. Write each entry as `<source dir>/mcp/<key>/config.json`, the directory name is the entry's key, there is no separate `"key"` field. Pretty-printed, 4-space indentation, one field per line, never a single compact line:
+1. Parse it (JSON, TOML, or JSONC, per the table). Read entries at the MCP key path.
+2. Write each entry to `<source dir>/mcp/<key>/config.json`. The directory name is the entry key. No separate `"key"` field. Pretty-print with 4-space indentation, one field per line:
 
     ```json
     {
@@ -69,71 +68,71 @@ If the table lists an MCP config file for the primary agent, and it exists:
 | `http` | `url` (required), `headers` |
 | `sse` | `url` (required), `headers` |
 
-Map native fields to their canonical name using the table's Native stdio/remote fields columns, the field holding the command becomes `command`, the field holding the URL becomes `url`, and so on for `args`, `env`, `cwd`, and `headers`. Keep any field the table doesn't name, carried into `config` unchanged. Three notations need extra handling:
+Map native fields to canonical names using the Native stdio/remote fields columns: command field becomes `command`, URL field becomes `url`, same for `args`, `env`, `cwd`, `headers`. Carry any field the table does not name into `config` unchanged. Three notations need extra handling:
 
-- `command:[cmd,...args]`: split the first array element into `command`, the rest into `args`.
-- `(no type)`: infer `http`, unless the URL or a sibling field says otherwise. Ask the user when it stays ambiguous.
+- `command:[cmd,...args]`: first array element becomes `command`, the rest become `args`.
+- `(no type)`: infer `http` unless the URL or a sibling field says otherwise. Ask the user if still ambiguous.
 - `(no native remote, see mcp-remote note)`: a stdio entry running `npx -y mcp-remote <url>` is a disguised remote server. Reverse it into a canonical `http` entry with that URL. Its headers are already gone, agenteq drops them on the way out.
 
-## 5. Reconcile every other agent's artifacts already in the repo
+## 5. Reconcile every other agent's artifacts
 
-Run `npx agenteq detect --json`. Every entry with `projectInstalled: true`, other than the primary agent, already has its own native files in this repo (paths in section 10's table). For each one:
+Run `npx agenteq detect --json`. Each entry with `projectInstalled: true`, other than the primary agent, has native files in this repo (paths in the section 10 table). For each:
 
-1. Read its guidelines file, skills, commands, and MCP config, the same way as step 4.
-2. Compare it against what step 4 wrote to the canonical directory.
-3. If a file matches, or the agent's file is empty or missing, do nothing. `agenteq sync` regenerates it.
-4. If a file differs, guidelines content, an extra or missing skill, an extra or missing command, or an MCP server the canonical set lacks, stop. Ask the user how to resolve it. Show the actual diff, not just the fact that one exists. Offer choices: fold the extra content into the canonical source, keep the canonical version, or skip it and flag it in the final report. Never guess and proceed silently.
+1. Read its guidelines file, skills, commands, MCP config, same as step 4.
+2. Compare against what step 4 wrote.
+3. File matches, or agent's file is empty or missing: do nothing. `agenteq sync` regenerates it.
+4. File differs (guidelines content, extra or missing skill, extra or missing command, MCP server missing from the canonical set): stop and ask the user. Show the actual diff, not only that one exists. Offer: fold the extra content into the canonical source, keep the canonical version, or skip and flag it in the final report. Never guess silently.
 
-Once every deviation is resolved, the canonical directory is the agreed source of truth.
+After every deviation is resolved, the canonical directory is the agreed source of truth.
 
 ## 6. Run the real sync
 
-Do not hand-roll agenteq's gitignore or file-writing logic. Run the tool itself.
+Do not hand-roll agenteq's gitignore or file-writing logic. Run the tool.
 
 ```bash
 npx agenteq init --agents <comma-separated agent names from steps 3 and 5> --source-dir <source dir> --yes
 ```
 
-Use `--agents` with the exact set confirmed in steps 3 and 5. The non-interactive flags avoid a picker this session cannot answer. If the user wants a different agent set, for example dropping one they no longer use, confirm it with them first.
+Use the exact agent set confirmed in steps 3 and 5. The flags skip the picker, which this session cannot answer. If the user wants a different set (e.g. dropping an unused agent), confirm first.
 
-This one command picks the capabilities, writes every agent's guidelines/skills/commands/MCP file from the canonical source, and gitignores each path it writes, using agenteq's own `git.ignore` logic rather than a hand-written `.gitignore` edit.
+This one command picks capabilities, writes every agent's guidelines/skills/commands/MCP file from the canonical source, and gitignores each path it writes using agenteq's own `git.ignore` logic.
 
 ## 7. Untrack generated files from git
 
-`agenteq init` prints a warning for any path it just started ignoring that was already tracked by git, plus the fix:
+`agenteq init` warns about any newly ignored path that git already tracks, and prints the fix:
 
 ```
 git rm -r --cached <paths>
 ```
 
-Run this command whenever that warning appears. This step is mandatory. Show the command to the user, and confirm before running it, untracking is reversible, but it changes what is staged for the next commit. Run it in the same turn once confirmed. Never end the skill, or a verification pass that re-ran `agenteq init`, with an unresolved warning still on screen. Afterward, stage the `.gitignore` update and the removal together, and confirm with `git status` that none of the warned paths remain tracked. Tell the user a commit is still needed. Do not commit on their behalf unless asked.
+Run it whenever the warning appears. This step is mandatory. Show the command and confirm with the user first. Untracking is reversible, but it changes what is staged for the next commit. After confirmation, run it in the same turn. Never end the skill, or a verification pass that re-ran `agenteq init`, with an unresolved warning on screen. Then stage the `.gitignore` update and the removal together, and confirm with `git status` that none of the warned paths remain tracked. Tell the user a commit is still needed. Do not commit unless asked.
 
-No warning means nothing to untrack.
+No warning: nothing to untrack.
 
-## 8. Set up a hook to keep sync current
+## 8. Hook to keep sync current
 
-`.ai/` content changes across branches. Checking out a branch with different guidelines, skills, commands, or MCP servers leaves every generated file stale, until someone runs `agenteq sync` by hand. A `post-checkout` git hook running `npx agenteq sync --yes --skip-in-ci` closes that gap.
+`.ai/` content changes across branches. After checking out a branch with different guidelines, skills, commands, or MCP servers, generated files are stale until someone runs `agenteq sync`. A `post-checkout` git hook running `npx agenteq sync --yes --skip-in-ci` fixes this.
 
-Reuse whatever hook system the repo already has. Never add a second one.
+Reuse the repo's existing hook system. Never add a second one.
 
-- Husky (a `.husky/` directory, or a `"prepare": "husky"` script in `package.json`): add or extend `.husky/post-checkout` with `npx agenteq sync --yes --skip-in-ci`.
-- lefthook (`lefthook.yml` or `lefthook.yaml`): add a `post-checkout` entry under `commands`, running `npx agenteq sync --yes --skip-in-ci`.
-- simple-git-hooks (a `"simple-git-hooks"` field in `package.json`): add `"post-checkout": "npx agenteq sync --yes --skip-in-ci"`. Tell the user to run `npx simple-git-hooks` once, to install it.
-- pre-commit framework (`.pre-commit-config.yaml`): add a local hook with `stages: [post-checkout]`, running `npx agenteq sync --yes --skip-in-ci`.
+- Husky (`.husky/` directory, or `"prepare": "husky"` in `package.json`): add or extend `.husky/post-checkout` with `npx agenteq sync --yes --skip-in-ci`.
+- lefthook (`lefthook.yml` or `lefthook.yaml`): add a `post-checkout` entry under `commands` running `npx agenteq sync --yes --skip-in-ci`.
+- simple-git-hooks (`"simple-git-hooks"` field in `package.json`): add `"post-checkout": "npx agenteq sync --yes --skip-in-ci"`. Tell the user to run `npx simple-git-hooks` once to install it.
+- pre-commit framework (`.pre-commit-config.yaml`): add a local hook with `stages: [post-checkout]` running `npx agenteq sync --yes --skip-in-ci`.
 - Overcommit (`.overcommit.yml`): add a `PostCheckout` hook running the same command.
-- A plain native hook (`.git/hooks/post-checkout`): append the sync call to it. Do not overwrite what it already does.
+- Plain native hook (`.git/hooks/post-checkout`): append the sync call. Do not overwrite existing content.
 
-None of those exist: ask the user which hook manager to install, or whether to skip hook setup entirely. Do not pick one on the user's behalf.
+None exist: ask the user which hook manager to install, or whether to skip hooks. Do not choose for them.
 
 Confirm with the user before adding or changing a hook.
 
 ## 9. Clean up superseded artifacts
 
-`agenteq sync` overwrites a same-named file at each agent's target path. It never deletes a file with no counterpart in the canonical source, for example a skill folder step 5 decided not to keep. List anything like that. Ask the user before deleting it. Never delete silently, this is exactly the stray content step 5 exists to catch.
+`agenteq sync` overwrites a same-named file at each agent's target path. It never deletes a file with no canonical counterpart, e.g. a skill folder step 5 decided not to keep. List such files. Ask the user before deleting. Never delete silently.
 
 ## 10. Reference: native paths and MCP shapes per agent
 
-Treat this table as the mapping agenteq ships today. If `npx agenteq detect --json` shows a capability that contradicts a row here, trust the tool's own output, the table is out of date. Note the discrepancy to the user rather than picking one silently.
+This table is the mapping agenteq ships today. If `npx agenteq detect --json` contradicts a row, trust the tool, the table is out of date. Tell the user about the discrepancy. Do not pick one silently.
 
 | Agent (`name`) | Guidelines | Skills dir | Commands dir | MCP config (format) | MCP key path | Native stdio fields | Native remote fields |
 |---|---|---|---|---|---|---|---|
@@ -160,8 +159,12 @@ Treat this table as the mapping agenteq ships today. If `npx agenteq detect --js
 | `roo` | `.roorules` | - | - | `.roo/mcp.json` (JSON) | `mcpServers` | `command, args, env, cwd` | `type` (`http` written as `streamable-http`), `url, headers` |
 | `kilo` | `.kilocode/rules/AGENTS.md` | - | - | `kilo.jsonc` (JSONC) | `mcp` | `type:"local", command:[cmd,...args], environment, enabled` | `type:"remote", url, headers, enabled` |
 
-A dash means the agent has no support for that capability at all. `command:[cmd,...args]` means the command and its arguments share one array, split them per section 4.4. `(no type)` means the agent's remote entries carry no `type` field, infer it per section 4.4. `(no native remote, see mcp-remote note)` means the agent has no remote MCP support at all, see section 4.4 for how to recognize and reverse the disguised entry.
+Legend:
+- `-`: agent has no support for that capability.
+- `command:[cmd,...args]`: command and arguments share one array. Split per section 4.4.
+- `(no type)`: remote entries carry no `type` field. Infer per section 4.4.
+- `(no native remote, see mcp-remote note)`: agent has no remote MCP support. See section 4.4 for recognizing and reversing the disguised entry.
 
 ## 11. Report back
 
-Summarize in plain terms: the reverse-engineering baseline agent, which other agents' artifacts were found and reconciled, how each deviation was resolved, what got untracked from git, and anything left for the user to decide. Keep it short, this is a status report, not a new artifact file.
+Short status summary: baseline agent, which other agents' artifacts were found and reconciled, how each deviation was resolved, what was untracked from git, and what is left for the user to decide. Not a new artifact file.
