@@ -22,7 +22,7 @@ For the full vocabulary, folder-by-folder layout, and style rules, see [write-ty
 
 ## Writing Style
 
-Every skill, guideline, and code comment in this project is written in Standard Technical English. That means plain, direct, unambiguous prose, built up one idea at a time instead of packed into a single dense sentence.
+Skills and guidelines are written terse. Drop filler, articles, and hedging when the sentence still reads clearly. Keep code, paths, commands, and names exact. Code comments stay plain full sentences, per [commenting-standards](./.ai/skills/commenting-standards/SKILL.md).
 
 ## Agent Behavior
 

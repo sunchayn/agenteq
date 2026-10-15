@@ -1,31 +1,34 @@
 ---
 name: add-agent-definition
-
 description: Procedural workflow for adding support for a new coding agent to agenteq.
 ---
 
 # Adding an Agent Definition
 
-## 1. What an agent definition is
+## 1. What a definition is
 
-One file under `src/modules/agents/definitions/`, exporting a single `new Agent({...})`. A capability that needs nothing beyond a directory or file path, `guidelinesPath`, `commandsDir`, `skillsDir`, is a bare string field. A capability with more shape to configure, `mcp`, gets its own configuration object, built with a `create{Name}Configuration` factory. `definitions/claude-code.ts` is a filled-in reference for this shape.
+One file in `src/modules/agents/definitions/`, exporting one `new Agent({...})`.
 
-## 2. Procedural steps
+- Capability needing only a path (`guidelinesPath`, `commandsDir`, `skillsDir`): plain string field.
+- Capability needing more shape (`mcp`): own configuration object, built with a `create{Name}Configuration` factory.
+- Reference: `definitions/claude-code.ts`.
 
-1. Create `src/modules/agents/definitions/{name}.ts`, default-exporting one `new Agent({...})`. See [write-typescript-code](../write-typescript-code/SKILL.md) section 4 for why this is a default export.
-2. Set `name` (machine-readable, snake_case) and `displayName` (human-readable).
-3. Set `detectSystemPathUsing`, a closure returning a `DetectionConfiguration` for how the agent's CLI is detected on the system, usually a `command` check.
-4. Set `detectProjectPathUsing`, a closure returning a `DetectionConfiguration` for how the agent is detected as already configured in the current project, usually `files` or `paths` checks.
-5. Opt into only the capabilities the agent actually supports: `guidelinesPath`, `commandsDir`, `skillsDir` (a plain string path each), `mcp` (a `McpConfiguration` built with `createMcpConfiguration`, taking a `configPath` and `entryMappers`).
-6. Register it in `src/modules/agents/registry.ts`: one import, one entry added to the exported `agentDefinitions` array.
+## 2. Steps
 
-No other source file should need to change. If adding an agent requires touching a sync stage, that's a sign a capability abstraction is leaking agent-specific logic. Reconsider the capability configuration instead of special-casing the new agent inside a stage.
+1. Create `src/modules/agents/definitions/{name}.ts`, default-exporting one `new Agent({...})`. Why default export: [write-typescript-code](../write-typescript-code/SKILL.md) section 4.
+2. Set `name` (snake_case, machine-readable) and `displayName`.
+3. Set `detectSystemPathUsing`: closure returning a `DetectionConfiguration` for CLI detection on the system, usually a `command` check.
+4. Set `detectProjectPathUsing`: closure returning a `DetectionConfiguration` for detecting the agent in the current project, usually `files` or `paths` checks.
+5. Set only capabilities the agent supports: `guidelinesPath`, `commandsDir`, `skillsDir` (string paths), `mcp` (`McpConfiguration` from `createMcpConfiguration`, with `configPath` and `entryMappers`).
+6. Register in `src/modules/agents/registry.ts`: one import, one entry in `agentDefinitions`.
 
-Two files outside the source tree still need updating: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md) and [add-agenteq-to-boost-project](../add-agenteq-to-boost-project/SKILL.md) each carry an identical reference table hardcoding every agent's native guidelines path, skills/commands directory, command file extension, and MCP config path, key path, and entry shape. Those skills run in a different repo with no access to this codebase, so neither can read `definitions/{name}.ts` directly. Adding a new agent, or changing any of those fields on an existing one, needs the matching row added or updated in both tables.
+No other source file should change. If a sync stage needs touching, a capability abstraction leaks agent-specific logic. Fix the capability configuration, not the stage.
+
+Two files outside the source tree need updating. [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md) and [add-agenteq-to-boost-project](../add-agenteq-to-boost-project/SKILL.md) each hold an identical table of every agent's native guidelines path, skills/commands directory, command file extension, and MCP config path, key path, and entry shape. They run in other repos and cannot read `definitions/{name}.ts`. When adding an agent, or changing any of those fields, update the row in both tables.
 
 ## 3. Related Skills
 
-- **General TypeScript conventions**: [write-typescript-code](../write-typescript-code/SKILL.md)
-- **Adding a sync capability**: [add-capability-stage](../add-capability-stage/SKILL.md)
-- **Verifying the new definition's output**: [e2e-test-agents](../e2e-test-agents/SKILL.md)
-- **Keeping the reverse-engineering tables current**: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md), [add-agenteq-to-boost-project](../add-agenteq-to-boost-project/SKILL.md)
+- General TypeScript conventions: [write-typescript-code](../write-typescript-code/SKILL.md)
+- Adding a sync capability: [add-capability-stage](../add-capability-stage/SKILL.md)
+- Verifying definition output: [e2e-test-agents](../e2e-test-agents/SKILL.md)
+- Reverse-engineering tables: [refactor-to-agenteq](../refactor-to-agenteq/SKILL.md), [add-agenteq-to-boost-project](../add-agenteq-to-boost-project/SKILL.md)

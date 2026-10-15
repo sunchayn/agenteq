@@ -1,41 +1,41 @@
 ---
 name: commenting-standards
-
 description: Comment writing, formatting, and wrapping rules for all TypeScript code in agenteq.
 ---
 
 # Commenting Standards
 
-These rules apply to every comment written in this codebase.
+Applies to every comment in this codebase.
 
 ## 1. Core principle
 
-Comment why, not what. Before writing a comment, ask whether it explains why the code exists or why it works this way, not what the next line does. If it only restates the next line, skip it.
+Comment why, not what. Skip a comment that only restates the next line.
 
-- Do comment: non-obvious decisions, workarounds, and the reasoning behind a choice between two approaches.
-- Do not comment: obvious code, or a step-by-step narration of what the next line already says.
-- Do not reference a ticket, issue, or the user request. A comment must stand on its own for a future reader who has none of that context.
-- Do not reference a previous version of the code, or how this version differs from it. Words like "instead", "now", "no longer", "used to", "previously", or a clause defending an absence ("with no X of its own") are the tell. Before finalizing a comment written or edited during a refactor, check whether it would make sense to someone who has never seen the prior version of the file. If it only parses as a contrast with something removed, cut that clause, or the whole comment, and state only the plain fact that remains. That kind of contrast belongs in a commit message or PR description, never in a docblock.
+- Do comment: non-obvious decisions, workarounds, reasoning behind choosing one approach over another.
+- Do not comment: obvious code, step-by-step narration.
+- Do not reference a ticket, issue, or user request. A comment must stand alone for a reader with no such context.
+- Do not reference a previous version of the code or how this version differs. Tells: "instead", "now", "no longer", "used to", "previously", or a clause defending an absence ("with no X of its own"). After a refactor, check each touched comment makes sense to someone who never saw the old file. If it only parses as a contrast with removed code, cut that clause or the comment, and keep only the plain remaining fact. Contrast belongs in a commit message or PR description.
 
 ## 2. Language
 
-- No metaphors, idioms, or narrative framing. Plain, direct language tied to concrete technical facts.
-- Name the variables and data structures directly when referring to them, instead of describing them indirectly.
-- No colon or semicolon joining two independent clauses. Split into two sentences instead.
-- Wrap only at a period or a comma, never mid-sentence.
+- No metaphors, idioms, or narrative framing. Plain language tied to concrete technical facts.
+- Name variables and data structures directly.
+- No colon or semicolon joining two independent clauses. Use two sentences.
+- Wrap only at a period or comma, never mid-sentence.
+- Use the existing technical term, not a paraphrase. Write "what tag HEAD is pointing at", not "the tag the branch is sitting on".
 
-## 3. Doc blocks versus inline comments
+## 3. Doc blocks and inline comments
 
-- A class or function doc block is always the expanded multi-line `/** ... */` form, never a single-line `/** ... */`, even when short.
-- A doc block stays conceptual: what the function achieves, its contract. It must never mention a specific variable name or a step of the internal control flow. That belongs in an inline comment placed at the line it explains.
-- A doc block's prose is at most 4 lines. If the explanation needs more, shorten it or break it into a list.
-- An inline comment (`//`) never exceeds 3 lines. If it needs more, shorten it, or move the explanation into the doc block above the function instead.
-- The last line of a multi-line comment, block or inline, carries at least 4 words. Rebalance the wrapping rather than leaving a short trailing fragment.
+- Class or function doc block: always expanded multi-line `/** ... */`, never single-line, even when short.
+- Doc block stays conceptual: what the function achieves, its contract. No variable names, no internal control flow steps. Those go in an inline comment at the line they explain.
+- Doc block prose: max 4 lines. Shorten or use a list.
+- Inline `//` comment: max 3 lines. Shorten, or move the explanation to the doc block.
+- Last line of a multi-line comment, block or inline: at least 4 words. Rebalance wrapping instead of leaving a short trailing fragment.
 
 ## 4. Current gap
 
-Many files in this codebase are under-commented inline today. Non-obvious branches and decision points, why this order, why this early return, why this fallback, are frequently left unexplained. This is not the target state. Backfill inline why-comments in any file you touch going forward. Do not treat the current sparse state as the pattern to copy.
+Many files lack inline why-comments on non-obvious branches and decisions (why this order, early return, fallback). That is not the target state. Backfill why-comments in any file you touch. Do not copy the sparse state.
 
 ## 5. Related Skills
 
-- **General TypeScript conventions**: [write-typescript-code](../write-typescript-code/SKILL.md)
+- General TypeScript conventions: [write-typescript-code](../write-typescript-code/SKILL.md)
