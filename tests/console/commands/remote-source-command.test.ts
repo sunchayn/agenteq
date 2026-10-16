@@ -701,6 +701,177 @@ describe("agenteq remote-source add", () => {
     });
 });
 
+describe("agenteq remote-source add (scriptable selection flags)", () => {
+    let originDir: string;
+
+    beforeEach(async () => {
+        originDir = await createOrigin();
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const skillADir = join(originDir, "skills/skill-a");
+        const skillBDir = join(originDir, "skills/skill-b");
+        const commandsDir = join(originDir, "commands");
+        const mcpDir = join(originDir, "mcp/server-a");
+
+        await mkdir(skillADir, { recursive: true });
+        await writeFile(join(skillADir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(skillBDir, { recursive: true });
+        await writeFile(join(skillBDir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(commandsDir, { recursive: true });
+        await writeFile(join(commandsDir, "cmd-a.md"), "hello", "utf8");
+
+        await mkdir(mcpDir, { recursive: true });
+        await writeFile(
+            join(mcpDir, "config.json"),
+            JSON.stringify({ config: { command: "npx" }, type: "stdio" }),
+            "utf8",
+        );
+
+        runGit(originDir, ["add", "skills", "commands", "mcp"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add capabilities"]);
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("selects only the named skills and skips the picker", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--skills",
+            "skill-a",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const saved = await readSavedFile();
+        const selection = saved.get("team")?.selection;
+
+        expect(selection?.skills).toEqual(["skill-a"]);
+        expect(selection?.commands).toEqual([]);
+        expect(selection?.mcp).toEqual([]);
+        expect(selection?.guidelines).toBe(false);
+    });
+
+    it("selects the right items per capability when --commands and --mcp are combined", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--commands",
+            "cmd-a.md",
+            "--mcp",
+            "server-a",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const saved = await readSavedFile();
+        const selection = saved.get("team")?.selection;
+
+        expect(selection?.commands).toEqual(["cmd-a.md"]);
+        expect(selection?.mcp).toEqual(["server-a"]);
+        expect(selection?.skills).toEqual([]);
+        expect(selection?.guidelines).toBe(false);
+    });
+
+    it("includes guidelines and nothing else when --guidelines is passed alone", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--guidelines",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const saved = await readSavedFile();
+        const selection = saved.get("team")?.selection;
+
+        expect(selection?.guidelines).toBe(true);
+        expect(selection?.skills).toEqual([]);
+        expect(selection?.commands).toEqual([]);
+        expect(selection?.mcp).toEqual([]);
+    });
+
+    it("throws a trackable CliError when a named skill does not exist", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add",
+                "team",
+                originDir,
+                "--skills",
+                "skill-a,does-not-exist",
+                "--path",
+                join(cwd, "clone"),
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_UNKNOWN_ITEM" });
+    });
+
+    it("still runs the interactive picker when no selection flag and no --yes are passed", async () => {
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+        const groupMultiselectMock = vi.fn().mockResolvedValue(["skill-a"]);
+        const confirmMock = vi.fn().mockResolvedValue(false);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        expect(groupMultiselectMock).toHaveBeenCalled();
+
+        vi.doUnmock("@clack/prompts");
+    });
+});
+
 describe("agenteq remote-source pin / unpin", () => {
     let originDir: string;
     let clonePath: string;
@@ -1043,6 +1214,76 @@ describe("agenteq remote-source update-choices", () => {
 
         vi.doUnmock("@clack/prompts");
         await rm(originDir, { force: true, recursive: true });
+    });
+});
+
+describe("agenteq remote-source update-choices (scriptable selection flags)", () => {
+    let originDir: string;
+
+    beforeEach(async () => {
+        originDir = await createOrigin();
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const skillADir = join(originDir, "skills/skill-a");
+        const commandsDir = join(originDir, "commands");
+
+        await mkdir(skillADir, { recursive: true });
+        await writeFile(join(skillADir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(commandsDir, { recursive: true });
+        await writeFile(join(commandsDir, "cmd-a.md"), "hello", "utf8");
+
+        runGit(originDir, ["add", "skills", "commands"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add capabilities"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--yes",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("replaces the saved selection with the named skill and skips the picker", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "update-choices",
+            "team",
+            "--skills",
+            "skill-a",
+        ]);
+
+        const saved = await readSavedFile();
+        const selection = saved.get("team")?.selection;
+
+        expect(selection?.skills).toEqual(["skill-a"]);
+        expect(selection?.commands).toEqual([]);
+        expect(selection?.guidelines).toBe(false);
+    });
+
+    it("throws a trackable CliError when a named command does not exist", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "update-choices",
+                "team",
+                "--commands",
+                "does-not-exist.md",
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_UNKNOWN_ITEM" });
     });
 });
 
