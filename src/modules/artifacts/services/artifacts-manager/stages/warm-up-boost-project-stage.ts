@@ -33,10 +33,12 @@ export default async function warmUpBoostProjectStage(
         return payload;
     }
 
-    await gitignoreBoostSkills(cwd, boostAgents);
+    const { isDryRun } = payload.context;
+
+    await gitignoreBoostSkills(cwd, boostAgents, isDryRun);
 
     return payload.withBoostGuidelines(
-        await resolveGuidelines(cwd, boostAgents),
+        await resolveGuidelines(cwd, boostAgents, isDryRun),
     );
 }
 
@@ -47,12 +49,14 @@ export default async function warmUpBoostProjectStage(
 async function resolveGuidelines(
     cwd: string,
     boostAgents: Agent[],
+    isDryRun: boolean | undefined,
 ): Promise<string | undefined> {
     for (const agent of boostAgents) {
         if (agent.guidelinesPath) {
             const guidelines = await extractGuidelines(
                 cwd,
                 agent.guidelinesPath,
+                isDryRun,
             );
 
             if (guidelines) {
@@ -67,6 +71,7 @@ async function resolveGuidelines(
 async function gitignoreBoostSkills(
     cwd: string,
     boostAgents: Agent[],
+    isDryRun: boolean | undefined,
 ): Promise<void> {
     for (const agent of boostAgents) {
         if (!agent.skillsDir) {
@@ -79,7 +84,8 @@ async function gitignoreBoostSkills(
             pattern: "**/*",
         });
 
-        if (files.length > 0) {
+        // A dry run only resolves the guidelines block, it never touches .gitignore.
+        if (files.length > 0 && !isDryRun) {
             await git.ignore({ cwd: cwd, relPath: agent.skillsDir });
         }
     }
@@ -88,6 +94,7 @@ async function gitignoreBoostSkills(
 async function extractGuidelines(
     cwd: string,
     relGuidelinesPath: string,
+    isDryRun: boolean | undefined,
 ): Promise<string | undefined> {
     const absolutePath = join(cwd, relGuidelinesPath);
     const content = await filesystem.readFile(absolutePath);
@@ -102,7 +109,10 @@ async function extractGuidelines(
         return undefined;
     }
 
-    await git.ignore({ cwd: cwd, relPath: relGuidelinesPath });
+    // A dry run only resolves the guidelines block, it never touches .gitignore.
+    if (!isDryRun) {
+        await git.ignore({ cwd: cwd, relPath: relGuidelinesPath });
+    }
 
     return match[1].trim();
 }

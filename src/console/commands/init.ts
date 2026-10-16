@@ -53,6 +53,10 @@ export function registerInitCommand(program: Command): void {
             "--skip-in-ci",
             "do nothing when run in a CI environment (env: AGENTEQ_SKIP_IN_CI)",
         )
+        .option(
+            "--dry-run",
+            "resolve and print what would be written, skipped, or removed, without touching disk or .gitignore (env: AGENTEQ_DRY_RUN)",
+        )
         .action(runInit);
 }
 
@@ -75,6 +79,7 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
 
     const context = {
         cwd: process.cwd(),
+        isDryRun: options.isDryRun,
         sourceDir: options.sourceDir,
     };
 
@@ -97,11 +102,14 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
         return;
     }
 
-    await saveAgentsFileAction({
-        agentNames: agents.map((agent) => agent.name),
-        capabilities: capabilities,
-        context: context,
-    });
+    // Skipped entirely during a dry run, which reports what would happen without writing anything.
+    if (!options.isDryRun) {
+        await saveAgentsFileAction({
+            agentNames: agents.map((agent) => agent.name),
+            capabilities: capabilities,
+            context: context,
+        });
+    }
 
     const hasFailed = await syncArtifactsAction({
         agents: agents,

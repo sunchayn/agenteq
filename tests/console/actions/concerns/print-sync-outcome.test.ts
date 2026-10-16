@@ -100,6 +100,66 @@ describe("printSyncOutcome: table rendering", () => {
     });
 });
 
+describe("printSyncOutcome: dry run", () => {
+    it("reworks a written or removed status into its would-be wording, without altering others", () => {
+        const tableSpy = vi
+            .spyOn(output, "table")
+            .mockImplementation(() => undefined);
+
+        const outroSpy = vi
+            .spyOn(output, "outro")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            isDryRun: true,
+            outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
+                results: [
+                    row(SyncStatus.Written),
+                    row(SyncStatus.Removed),
+                    row(SyncStatus.Unsupported),
+                ],
+                sourceDir: ".ai",
+            }),
+        });
+
+        expect(tableSpy).toHaveBeenCalledWith(
+            ["Agent", "Capability", "Item", "Status"],
+            [
+                ["claude_code", "mcp", "example", "would write"],
+                ["claude_code", "mcp", "example", "would remove"],
+                ["claude_code", "mcp", "example", "unsupported"],
+            ],
+        );
+
+        expect(outroSpy).toHaveBeenCalledWith(
+            "Dry run complete. Nothing was written.",
+        );
+    });
+
+    it("includes the dryRun flag in the JSON payload", () => {
+        const writeSpy = vi
+            .spyOn(output, "writeRaw")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            isDryRun: true,
+            isJson: true,
+            outcome: new SyncOutcome({
+                requestedCapabilities: Object.values(AgentCapability),
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        const payload = JSON.parse(writeSpy.mock.calls[0]?.[0] ?? "") as {
+            dryRun: boolean;
+        };
+
+        expect(payload.dryRun).toBe(true);
+    });
+});
+
 describe("printSyncOutcome: gitignore alerts", () => {
     it("warns with the untrack command when paths were newly gitignored", () => {
         vi.spyOn(output, "table").mockImplementation(() => undefined);

@@ -317,6 +317,59 @@ describe("agenteq sync: auto-detection", () => {
     });
 });
 
+describe("agenteq sync: --dry-run", () => {
+    it("reports what would happen without persisting the agents file or writing artifacts", async () => {
+        detectAgentsMock.mockResolvedValue(detected([claudeCode, true]));
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--agents",
+            "claude_code",
+            "--json",
+            "--dry-run",
+        ]);
+
+        expect(await readAgentsFile(context)).toBeUndefined();
+        expect(process.exitCode).toBeFalsy();
+    });
+
+    it("never calls saveAgentsFileAction when the saved agents file resolves normally", async () => {
+        await saveAgentsFileAction({
+            agentNames: ["cursor"],
+            capabilities: Object.values(AgentCapability),
+            context: context,
+        });
+
+        const syncSpy = vi
+            .spyOn(syncArtifactsActionModule, "default")
+            .mockResolvedValue(false);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--yes",
+            "--json",
+            "--dry-run",
+            "--only",
+            "mcp",
+        ]);
+
+        expect(syncSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                context: expect.objectContaining({ isDryRun: true }),
+            }),
+        );
+
+        syncSpy.mockRestore();
+
+        // --only forced a dirty capabilities list, which a normal run would persist back.
+        expect(await readAgentsFile(context)).toEqual(["cursor"]);
+    });
+});
+
 describe("agenteq sync: --skip-in-ci", () => {
     it("does nothing when run in CI with --skip-in-ci", async () => {
         isCIMock.mockReturnValue(true);

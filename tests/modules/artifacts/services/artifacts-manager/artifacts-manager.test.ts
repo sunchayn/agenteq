@@ -134,6 +134,90 @@ describe("artifactsManager.sync", () => {
         );
     });
 
+    it("resolves every capability and reports what would happen, without writing anything, in a dry run", async () => {
+        await mkdir(join(cwd, ".ai/commands"), { recursive: true });
+        await writeFile(join(cwd, ".ai/commands/example.md"), "hello");
+
+        await mkdir(join(cwd, ".ai/skills/example"), { recursive: true });
+        await writeFile(join(cwd, ".ai/skills/example/SKILL.md"), "hello");
+
+        await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        await writeFile(join(cwd, ".ai/GUIDELINES.md"), "# Hello\n");
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [
+                AgentCapability.Mcp,
+                AgentCapability.Commands,
+                AgentCapability.Skills,
+                AgentCapability.Guidelines,
+            ],
+            context: { cwd: cwd, isDryRun: true, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.hasFailed).toBe(false);
+        expect(
+            outcome.results.map((r) => `${r.capability}:${r.status}`).sort(),
+        ).toEqual([
+            "commands:written",
+            "guidelines:written",
+            "mcp:written",
+            "skills:written",
+        ]);
+
+        expect(await filesystem.exists(join(cwd, ".mcp.json"))).toBe(false);
+        expect(await filesystem.exists(join(cwd, "TEST.md"))).toBe(false);
+        expect(await filesystem.exists(join(cwd, ".test/commands"))).toBe(
+            false,
+        );
+
+        expect(await filesystem.exists(join(cwd, ".test/skills"))).toBe(false);
+
+        expect(await filesystem.exists(join(cwd, ".gitignore"))).toBe(false);
+    });
+
+    it("reports an mcp entry that would be removed, without actually removing it, in a dry run", async () => {
+        await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        await rm(join(cwd, ".ai/mcp/example"), { recursive: true });
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, isDryRun: true, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(
+            outcome.results.find((result) => result.item === "example"),
+        ).toMatchObject({ status: SyncStatus.Removed });
+
+        expect(
+            JSON.parse(await readFile(join(cwd, ".mcp.json"), "utf8"))
+                .mcpServers.example,
+        ).toBeDefined();
+    });
+
     it("marks an agent with no mcp support as unsupported for each discovered entry", async () => {
         await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
         await writeFile(
