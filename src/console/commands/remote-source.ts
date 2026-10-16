@@ -56,6 +56,22 @@ export function registerRemoteSourceCommand(program: Command): void {
         )
         .option("--yes", "run non-interactively (env: AGENTEQ_YES)")
         .option(
+            "--skills <names>",
+            "comma-separated skill names to select, skips the picker",
+        )
+        .option(
+            "--commands <names>",
+            "comma-separated command names to select, skips the picker",
+        )
+        .option(
+            "--mcp <names>",
+            "comma-separated mcp server names to select, skips the picker",
+        )
+        .option(
+            "--guidelines",
+            "select this source's GUIDELINES.md, skips the picker",
+        )
+        .option(
             "--json",
             "print machine-readable JSON instead of text (env: AGENTEQ_JSON)",
         )
@@ -82,6 +98,22 @@ export function registerRemoteSourceCommand(program: Command): void {
         .command("update-choices <name>")
         .description(
             "Pull one named remote source and re-prompt you to update its previous choices (Guidelines, Skills, Commands, MCPs)",
+        )
+        .option(
+            "--skills <names>",
+            "comma-separated skill names to select, skips the picker",
+        )
+        .option(
+            "--commands <names>",
+            "comma-separated command names to select, skips the picker",
+        )
+        .option(
+            "--mcp <names>",
+            "comma-separated mcp server names to select, skips the picker",
+        )
+        .option(
+            "--guidelines",
+            "select this source's GUIDELINES.md, skips the picker",
         )
         .option(
             "--json",
@@ -161,7 +193,14 @@ type PinFlag = typeof LATEST_TAG | typeof HEAD | string;
  */
 type RawPinFlag = true | string | undefined;
 
-interface AddOptions {
+interface ScriptableSelectionOptions {
+    skills?: string;
+    commands?: string;
+    mcp?: string;
+    guidelines?: boolean;
+}
+
+interface AddOptions extends ScriptableSelectionOptions {
     path?: string;
     ignored?: boolean;
     pin?: RawPinFlag;
@@ -174,6 +213,9 @@ interface RemoteSourceOptions {
     json?: boolean;
     sourceDir?: string;
 }
+
+interface UpdateChoicesOptions
+    extends ScriptableSelectionOptions, RemoteSourceOptions {}
 
 interface ResolvedOptions {
     isJson: boolean;
@@ -223,9 +265,11 @@ async function runAdd(
 
     assertUsableCapabilities(capabilities, name);
 
-    const selection = canInteract
-        ? await promptForSelection(capabilities, emptySelection())
-        : selectEverything(capabilities);
+    const selection = hasExplicitSelection(rawOptions)
+        ? resolveExplicitSelection(rawOptions, capabilities, name)
+        : canInteract
+          ? await promptForSelection(capabilities, emptySelection())
+          : selectEverything(capabilities);
 
     const updated = file.withRemote(name, {
         ref: ref,
@@ -307,7 +351,7 @@ async function runList(rawOptions: RemoteSourceOptions): Promise<void> {
 
 async function runUpdateChoices(
     name: string,
-    rawOptions: RemoteSourceOptions,
+    rawOptions: UpdateChoicesOptions,
 ): Promise<void> {
     const options = resolveOptions(rawOptions);
     const context = { cwd: process.cwd(), sourceDir: options.sourceDir };
@@ -317,10 +361,12 @@ async function runUpdateChoices(
 
     assertRemoteConfigured(entry, name);
 
-    if (!(input.isInteractive() && !options.shouldSkipPrompts)) {
+    const canInteract = input.isInteractive() && !options.shouldSkipPrompts;
+
+    if (!hasExplicitSelection(rawOptions) && !canInteract) {
         throw new CliError(
             "E_REMOTE_SOURCE_NEEDS_PROMPT",
-            "`remote-source update-choices` needs an interactive terminal to show its picker.",
+            "`remote-source update-choices` needs an interactive terminal to show its picker, or a scriptable selection flag such as --skills.",
         );
     }
 
@@ -340,7 +386,9 @@ async function runUpdateChoices(
         rootDir: clonePath,
     });
 
-    const selection = await promptForSelection(capabilities, entry.selection);
+    const selection = hasExplicitSelection(rawOptions)
+        ? resolveExplicitSelection(rawOptions, capabilities, name)
+        : await promptForSelection(capabilities, entry.selection);
 
     const updated = file.withRemote(name, {
         ref: entry.ref,
@@ -691,6 +739,81 @@ function selectEverything(
         mcp: capabilities.mcp,
         skills: capabilities.skills,
     };
+}
+
+/**
+ * Reports whether `add` or `update-choices` was given any scriptable selection flag,
+ * `--skills`, `--commands`, `--mcp`, or `--guidelines`.
+ * Their presence, not `--yes`, is what skips the interactive picker.
+ */
+function hasExplicitSelection(options: ScriptableSelectionOptions): boolean {
+    return (
+        options.skills !== undefined ||
+        options.commands !== undefined ||
+        options.mcp !== undefined ||
+        options.guidelines === true
+    );
+}
+
+/**
+ * Builds a selection straight from `add`'s or `update-choices`'s scriptable flags.
+ * No picker is involved.
+ * A capability whose flag was not passed selects nothing from that capability,
+ * unlike `--yes`, which selects everything.
+ */
+function resolveExplicitSelection(
+    options: ScriptableSelectionOptions,
+    capabilities: RemoteCapabilities,
+    name: string,
+): RemoteSourceSelection {
+    const skills = parseItemList(options.skills);
+    const commands = parseItemList(options.commands);
+    const mcp = parseItemList(options.mcp);
+
+    assertItemsExist(skills, capabilities.skills, "skill", name);
+    assertItemsExist(commands, capabilities.commands, "command", name);
+    assertItemsExist(mcp, capabilities.mcp, "mcp server", name);
+
+    return {
+        commands: commands,
+        guidelines: options.guidelines ?? false,
+        mcp: mcp,
+        skills: skills,
+    };
+}
+
+/**
+ * Splits a `--skills`/`--commands`/`--mcp` flag's comma-separated value into item names.
+ * An omitted flag is an empty list, not "every item".
+ */
+function parseItemList(raw: string | undefined): string[] {
+    if (raw === undefined) {
+        return [];
+    }
+
+    return raw
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+}
+
+/**
+ * Throws a trackable CliError naming every requested item the remote source does not actually offer.
+ */
+function assertItemsExist(
+    requested: string[],
+    available: string[],
+    itemLabel: string,
+    name: string,
+): void {
+    const unknown = requested.filter((item) => !available.includes(item));
+
+    if (unknown.length > 0) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_UNKNOWN_ITEM",
+            `"${pc.bold(name)}" has no ${itemLabel} named ${unknown.map((item) => pc.bold(item)).join(", ")}. Available, ${available.join(", ") || "none"}.`,
+        );
+    }
 }
 
 async function promptForSelection(
