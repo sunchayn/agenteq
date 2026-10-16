@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0](https://github.com/sunchayn/agenteq/compare/v1.4.0...v1.5.0) (2026-10-16)
+
+
+### Added
+
+* **artifacts:** add scriptable selection flags to remote-source ([#48](https://github.com/sunchayn/agenteq/issues/48)) ([60fa959](https://github.com/sunchayn/agenteq/commit/60fa959b5120d093e0dd9b7a6825abca994b4429))
+* **artifacts:** allow pinning a remote source ([#41](https://github.com/sunchayn/agenteq/issues/41)) ([ecc2492](https://github.com/sunchayn/agenteq/commit/ecc2492d3780dc77bb191895c3917995a34ae50e))
+* **artifacts:** discover artifacts in remote sub-folders ([#40](https://github.com/sunchayn/agenteq/issues/40)) ([228038b](https://github.com/sunchayn/agenteq/commit/228038be1aa1030822baa0240a05bb634a9a9c72))
+* **console:** add --dry-run to sync and init ([#47](https://github.com/sunchayn/agenteq/issues/47)) ([4c0725b](https://github.com/sunchayn/agenteq/commit/4c0725b30afb4a4ed7e69abb70f4981ba645b2a8))
+
+
+### Fixed
+
+* **artifacts:** detect hand-edited artifacts before sync overwrites them ([#43](https://github.com/sunchayn/agenteq/issues/43)) ([06052d8](https://github.com/sunchayn/agenteq/commit/06052d8b5731b10e509ff81e505246d516d73d36))
+* track remote local clone in the manifest instead ([#37](https://github.com/sunchayn/agenteq/issues/37)) ([fc1ee7e](https://github.com/sunchayn/agenteq/commit/fc1ee7e7a3de92808e9f45cc0b08de8bf0c95ba1))
+
 ## [1.4.0](https://github.com/sunchayn/agenteq/compare/v1.3.0...v1.4.0) (2026-09-16)
 
 ### Added
