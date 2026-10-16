@@ -20,6 +20,7 @@ export default async function syncArtifactsAction(
         context,
         isJson,
         label,
+        shouldForce,
         shouldSkipPrompts,
         shouldUpdatePins,
     } = options;
@@ -45,6 +46,7 @@ export default async function syncArtifactsAction(
         capabilities: capabilities,
         context: context,
         selectedAgents: agents,
+        shouldForce: shouldForce,
     });
 
     const outcomeWithPinWarnings =
@@ -74,6 +76,7 @@ interface RunSyncFlowOptions {
     context: RunContext;
     isJson: boolean;
     label: string;
+    shouldForce?: boolean;
     shouldSkipPrompts: boolean;
     shouldUpdatePins?: boolean;
 }

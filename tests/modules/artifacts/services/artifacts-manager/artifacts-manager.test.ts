@@ -26,6 +26,7 @@ import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
 import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-action.js";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
+import { CliError } from "@support/errors/cli-error.js";
 
 const baseAgentOptions: AgentOptions = {
     detectProjectPathUsing: () => createDetectionConfiguration({}),
@@ -277,7 +278,8 @@ describe("artifactsManager.sync", () => {
             (call) => call[0] === join(cwd, ".mcp.json"),
         );
 
-        expect(mcpReads).toHaveLength(1);
+        // One read merges both entries, the other hashes the written file for the sync manifest.
+        expect(mcpReads).toHaveLength(2);
 
         const written = JSON.parse(
             await readFile(join(cwd, ".mcp.json"), "utf8"),
@@ -1552,5 +1554,92 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
         expect(
             await readFile(join(cwd, ".test/commands/shared.md"), "utf8"),
         ).toBe("shared");
+    });
+});
+
+describe("artifactsManager.sync hand-edit protection", () => {
+    let cwd: string;
+
+    const agent = new Agent({
+        ...baseAgentOptions,
+        guidelinesPath: "CLAUDE.md",
+    });
+
+    beforeEach(async () => {
+        cwd = await mkdtemp(join(tmpdir(), "agenteq-hand-edit-"));
+        await mkdir(join(cwd, ".ai"), { recursive: true });
+        await writeFile(join(cwd, ".ai/GUIDELINES.md"), "# Hello\n");
+    });
+
+    afterEach(async () => {
+        await rm(cwd, { force: true, recursive: true });
+    });
+
+    function syncOnce() {
+        return artifactsManager.sync({
+            capabilities: [AgentCapability.Guidelines],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [agent],
+        });
+    }
+
+    it("succeeds on a second sync when nothing was edited by hand", async () => {
+        await syncOnce();
+
+        await writeFile(join(cwd, ".ai/GUIDELINES.md"), "# Updated\n");
+
+        const outcome = await syncOnce();
+
+        expect(outcome.hasFailed).toBe(false);
+        expect(await readFile(join(cwd, "CLAUDE.md"), "utf8")).toContain(
+            "# Updated",
+        );
+    });
+
+    it("stops before overwriting a file edited by hand since the last sync", async () => {
+        await syncOnce();
+
+        await writeFile(join(cwd, "CLAUDE.md"), "hand-edited content");
+
+        await expect(syncOnce()).rejects.toThrow(CliError);
+
+        // The hand edit survives, sync never got to the write.
+        expect(await readFile(join(cwd, "CLAUDE.md"), "utf8")).toBe(
+            "hand-edited content",
+        );
+    });
+
+    it("lists every hand-edited path in the thrown error", async () => {
+        await syncOnce();
+
+        await writeFile(join(cwd, "CLAUDE.md"), "hand-edited content");
+
+        await expect(syncOnce()).rejects.toThrow(/CLAUDE\.md/);
+    });
+
+    it("overwrites a hand-edited file anyway when shouldForce is set", async () => {
+        await syncOnce();
+
+        await writeFile(join(cwd, "CLAUDE.md"), "hand-edited content");
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Guidelines],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [agent],
+            shouldForce: true,
+        });
+
+        expect(outcome.hasFailed).toBe(false);
+        expect(await readFile(join(cwd, "CLAUDE.md"), "utf8")).toContain(
+            "# Hello",
+        );
+    });
+
+    it("never blocks the very first sync, with no manifest saved yet", async () => {
+        await writeFile(join(cwd, "CLAUDE.md"), "pre-existing hand content");
+
+        const outcome = await syncOnce();
+
+        expect(outcome.hasFailed).toBe(false);
     });
 });

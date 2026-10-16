@@ -10,6 +10,7 @@ const ENV_KEYS = [
     "AGENTEQ_SOURCE_DIR",
     "AGENTEQ_SKIP_IN_CI",
     "AGENTEQ_UPDATE_PINS",
+    "AGENTEQ_FORCE",
 ];
 
 afterEach(() => {
@@ -103,5 +104,25 @@ describe("resolveCommonSyncOptions", () => {
         const resolved = resolveCommonSyncOptions({});
 
         expect(resolved.shouldUpdatePins).toBe(true);
+    });
+
+    it("defaults shouldForce to false with nothing set", () => {
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.shouldForce).toBe(false);
+    });
+
+    it("--force takes precedence over AGENTEQ_FORCE", () => {
+        process.env.AGENTEQ_FORCE = "";
+        const resolved = resolveCommonSyncOptions({ force: true });
+
+        expect(resolved.shouldForce).toBe(true);
+    });
+
+    it("falls back to AGENTEQ_FORCE when --force is absent", () => {
+        process.env.AGENTEQ_FORCE = "1";
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.shouldForce).toBe(true);
     });
 });
