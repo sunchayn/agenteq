@@ -54,4 +54,5 @@ export interface RawSyncOptions {
     skipInCi?: boolean;
     updatePins?: boolean;
     dryRun?: boolean;
+    force?: boolean;
 }

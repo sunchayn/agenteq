@@ -58,6 +58,10 @@ export function registerSyncCommand(program: Command): void {
             "--dry-run",
             "resolve and print what would be written, skipped, or removed, without touching disk or .gitignore (env: AGENTEQ_DRY_RUN)",
         )
+        .option(
+            "--force",
+            "overwrite an artifact even if it was hand-edited since the last sync (env: AGENTEQ_FORCE)",
+        )
         .action(async (rawOptions: RawSyncOptions) => {
             const options = resolveCommonSyncOptions(rawOptions);
 
@@ -143,6 +147,7 @@ export function registerSyncCommand(program: Command): void {
                 context: context,
                 isJson: options.isJson,
                 label: "agenteq sync",
+                shouldForce: options.shouldForce,
                 shouldSkipPrompts: options.shouldSkipPrompts,
                 shouldUpdatePins: options.shouldUpdatePins,
             });

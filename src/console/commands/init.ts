@@ -57,6 +57,10 @@ export function registerInitCommand(program: Command): void {
             "--dry-run",
             "resolve and print what would be written, skipped, or removed, without touching disk or .gitignore (env: AGENTEQ_DRY_RUN)",
         )
+        .option(
+            "--force",
+            "overwrite an artifact even if it was hand-edited since the last sync (env: AGENTEQ_FORCE)",
+        )
         .action(runInit);
 }
 
@@ -116,8 +120,9 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
         capabilities: capabilities,
         context: context,
         isJson: options.isJson,
-        shouldSkipPrompts: options.shouldSkipPrompts,
         label: "agenteq init",
+        shouldForce: options.shouldForce,
+        shouldSkipPrompts: options.shouldSkipPrompts,
     });
 
     process.exitCode = hasFailed ? 1 : 0;

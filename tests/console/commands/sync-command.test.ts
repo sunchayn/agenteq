@@ -315,6 +315,33 @@ describe("agenteq sync: auto-detection", () => {
 
         syncSpy.mockRestore();
     });
+
+    it("forwards --force to syncArtifactsAction", async () => {
+        await saveAgentsFileAction({
+            agentNames: ["claude_code"],
+            capabilities: Object.values(AgentCapability),
+            context: context,
+        });
+
+        const syncSpy = vi
+            .spyOn(syncArtifactsActionModule, "default")
+            .mockResolvedValue(false);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "sync",
+            "--yes",
+            "--json",
+            "--force",
+        ]);
+
+        expect(syncSpy).toHaveBeenCalledWith(
+            expect.objectContaining({ shouldForce: true }),
+        );
+
+        syncSpy.mockRestore();
+    });
 });
 
 describe("agenteq sync: --dry-run", () => {

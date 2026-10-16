@@ -111,6 +111,7 @@ The `sync` command also takes `--update-pins` (env: `AGENTEQ_UPDATE_PINS`), whic
 | `--json`                                  | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
 | `--source-dir <dir>`                      | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
 | `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
+| `--force`                                 | Overwrite an artifact even if it was hand-edited since the last sync. See [hand-edit protection](#hand-edit-protection) below.                                                                                                 |
 
 Each flag above also has an environment variable equivalent, it might be useful for setting it once in CI:
 
@@ -120,6 +121,7 @@ Each flag above also has an environment variable equivalent, it might be useful 
 - AGENTEQ_JSON
 - AGENTEQ_SOURCE_DIR
 - AGENTEQ_SKIP_IN_CI
+- AGENTEQ_FORCE
 
 A CLI flag always overrides its matching environment variable.
 
@@ -127,6 +129,12 @@ The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer a
 
 > [!TIP]
 > In CI, if no agents are configured, no file is saved, and `--agents` is not set, `sync` fails immediately with an error instead. Passing `--agents`, or setting `AGENTEQ_AGENTS`, avoids this.<br />CI is detected automatically, and you can also force this same non-interactive behavior with `--yes` or `--json`.
+
+### Hand-edit protection
+
+After every sync, Agenteq saves the content hash of every artifact it wrote, at `<source-dir>/agenteq-sync-manifest.json`. The next time you run `init` or `sync`, it checks each previously written artifact's current content against that saved hash. If an artifact such as `CLAUDE.md` or `.cursor/mcp.json` was edited by hand since the last sync, Agenteq stops before overwriting anything and lists which file(s) were edited.
+
+Pass `--force` (env: `AGENTEQ_FORCE`) to overwrite anyway.
 
 ## Advanced Usage
 
@@ -277,6 +285,7 @@ If a command fails, the error message starts with a code in parentheses, for exa
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `E_UNKNOWN_AGENT`                    | An agent name you passed, for example to `--agents`, does not match any supported agent. Run `agenteq detect` for the exact names.                                                                                       |
 | `E_UNKNOWN_CAPABILITY`               | A capability name you passed to `--only` does not match one of `mcp`, `commands`, `skills`, `guidelines`.                                                                                                                |
+| `E_HAND_EDITED_ARTIFACTS`            | An artifact Agenteq previously wrote was edited by hand since the last sync. See [hand-edit protection](#hand-edit-protection). Pass `--force` to overwrite it anyway.                                                   |
 | `E_INVALID_MCP_CONFIG`               | A file under `.ai/mcp/<name>/config.json` is not valid JSON, or does not match the shape described below.                                                                                                                |
 | `E_INVALID_REMOTE_SOURCE`            | The cloned repository has none of `mcp/`, `commands/`, `skills/`, or `GUIDELINES.md` at its root.                                                                                                                        |
 | `E_REMOTE_SOURCE_ALREADY_EXISTS`     | The `remote-source add` was given a name that's already configured. Remove it first, or pick a different name.                                                                                                           |
