@@ -8,6 +8,7 @@ import env from "@infrastructure/env.js";
 import output from "@infrastructure/terminal/output.js";
 import { expandPath } from "@support/utils/expand-path.js";
 import { formatErrorDetails } from "@support/utils/format-error-details.js";
+import { normalizeGitUrl } from "@support/utils/normalize-git-url.js";
 import { defaultClonePathFor } from "@support/utils/agenteq-sources-root.js";
 import { CliError } from "@support/errors/cli-error.js";
 import artifactsManager from "@artifacts/services/artifacts-manager/index.js";
@@ -627,10 +628,6 @@ async function resolveOrCloneRepo(
             `Could not clone ${pc.bold(gitUrl)}.${formatErrorDetails(result.detail)}`,
         );
     }
-}
-
-function normalizeGitUrl(url: string): string {
-    return url.replace(/\.git$/, "").replace(/\/$/, "");
 }
 
 function assertRemoteNameNotTaken(file: RemoteSourcesFile, name: string) {
