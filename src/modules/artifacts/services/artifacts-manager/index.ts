@@ -56,6 +56,7 @@ async function sync(options: SyncOptions): Promise<SyncOutcome> {
     });
 
     return new SyncOutcome({
+        commentsStrippedPaths: payload.commentsStrippedPaths,
         gitignoreAlerts: [...gitignoreAlerts],
         remoteSourceWarnings: payload.remoteSourceWarnings,
         requestedCapabilities: capabilities,

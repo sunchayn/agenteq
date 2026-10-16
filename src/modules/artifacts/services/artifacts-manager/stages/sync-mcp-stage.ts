@@ -25,9 +25,12 @@ export default async function syncMcpStage(
         return payload;
     }
 
-    const { artifactPaths, results } = await installMcpServers(payload);
+    const { artifactPaths, commentsStrippedPaths, results } =
+        await installMcpServers(payload);
 
-    return payload.withResults(results, artifactPaths);
+    return payload
+        .withResults(results, artifactPaths)
+        .withCommentsStrippedPaths(commentsStrippedPaths);
 }
 
 /*
@@ -47,6 +50,7 @@ interface PendingMcpWrite {
 interface InstallMcpServersResult {
     results: SyncResult[];
     artifactPaths: string[];
+    commentsStrippedPaths: string[];
 }
 
 interface CollectConfigWritesOptions {
@@ -58,6 +62,11 @@ interface CollectConfigWritesOptions {
 interface CollectConfigWritesResult {
     writesByFile: Map<string, PendingMcpWrite>;
     results: SyncResult[];
+}
+
+interface ProcessFileResult {
+    statusesByKey: Map<string, SyncStatus>;
+    hadComments: boolean;
 }
 
 /*
@@ -118,9 +127,13 @@ async function installMcpServers(
     });
 
     const artifactPaths: string[] = [];
+    const commentsStrippedPaths: string[] = [];
 
     for (const [filePath, write] of writesByFile) {
-        const statusesByKey = await processFile(filePath, write);
+        const { hadComments, statusesByKey } = await processFile(
+            filePath,
+            write,
+        );
 
         for (const agentDisplayName of write.agentDisplayNames) {
             for (const [key, status] of statusesByKey) {
@@ -138,9 +151,17 @@ async function installMcpServers(
         // Gitignore every resolved config path, even one left unwritten this run because its content already matched.
         await git.ignore({ cwd: cwd, relPath: relPath });
         artifactPaths.push(relPath);
+
+        if (hadComments) {
+            commentsStrippedPaths.push(relPath);
+        }
     }
 
-    return { artifactPaths: artifactPaths, results: results };
+    return {
+        artifactPaths: artifactPaths,
+        commentsStrippedPaths: commentsStrippedPaths,
+        results: results,
+    };
 }
 
 /**
@@ -214,16 +235,17 @@ function detectFormat(filePath: string): ConfigFileFormat {
 /**
  * Reads one file once, reconciles its servers map against the canonical set,
  * and writes it back only if that actually changed it.
- * Returns the resulting status of every key that changed.
+ * Returns the resulting status of every key that changed, plus whether the file needed the comment-tolerant parse.
+ * That parse means this rewrite drops the file's original comments.
  */
 async function processFile(
     filePath: string,
     write: PendingMcpWrite,
-): Promise<Map<string, SyncStatus>> {
+): Promise<ProcessFileResult> {
     const format = detectFormat(filePath);
     const originalText = (await filesystem.readFile(filePath)) ?? "";
 
-    const { statusesByKey, text } = reconcileMcpServersAction({
+    const { hadComments, statusesByKey, text } = reconcileMcpServersAction({
         format: format,
         mcp: write.mcp,
         servers: write.servers,
@@ -231,11 +253,11 @@ async function processFile(
     });
 
     if (text === originalText) {
-        return statusesByKey;
+        return { hadComments: hadComments, statusesByKey: statusesByKey };
     }
 
     await filesystem.mkdir(dirname(filePath));
     await filesystem.writeFile({ content: text, path: filePath });
 
-    return statusesByKey;
+    return { hadComments: hadComments, statusesByKey: statusesByKey };
 }

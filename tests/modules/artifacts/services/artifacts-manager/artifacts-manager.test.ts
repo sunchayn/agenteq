@@ -335,6 +335,37 @@ describe("artifactsManager.sync", () => {
         );
     });
 
+    it("reports that an agent's existing mcp config file had its comments stripped", async () => {
+        await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/mcp/example/config.json"),
+            JSON.stringify({
+                config: { command: "npx" },
+                type: "stdio",
+            }),
+        );
+
+        await writeFile(
+            join(cwd, ".mcp.json"),
+            `{
+                // a hand-written comment
+                "mcpServers": {},
+            }`,
+        );
+
+        const outcome = await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [testAgent],
+        });
+
+        expect(outcome.commentsStrippedPaths).toEqual([".mcp.json"]);
+        expect(
+            JSON.parse(await readFile(join(cwd, ".mcp.json"), "utf8"))
+                .mcpServers.example,
+        ).toEqual({ args: [], command: "npx" });
+    });
+
     it("re-syncs an mcp entry whose canonical config changed since it was last written", async () => {
         await mkdir(join(cwd, ".ai/mcp/example"), { recursive: true });
         await writeFile(

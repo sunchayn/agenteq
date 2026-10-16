@@ -11,6 +11,7 @@ export class SyncOutcome {
     readonly gitignoreAlerts: string[];
     readonly remoteSourceWarnings: string[];
     readonly requestedCapabilities: AgentCapability[];
+    readonly commentsStrippedPaths: string[];
 
     constructor(options: SyncOutcomeOptions) {
         this.results = options.results;
@@ -18,6 +19,7 @@ export class SyncOutcome {
         this.gitignoreAlerts = options.gitignoreAlerts ?? [];
         this.remoteSourceWarnings = options.remoteSourceWarnings ?? [];
         this.requestedCapabilities = options.requestedCapabilities;
+        this.commentsStrippedPaths = options.commentsStrippedPaths ?? [];
     }
 
     get hasFailed(): boolean {
@@ -37,6 +39,7 @@ export class SyncOutcome {
      */
     withRemoteSourceWarnings(remoteSourceWarnings: string[]): SyncOutcome {
         return new SyncOutcome({
+            commentsStrippedPaths: this.commentsStrippedPaths,
             gitignoreAlerts: this.gitignoreAlerts,
             remoteSourceWarnings: remoteSourceWarnings,
             requestedCapabilities: this.requestedCapabilities,
@@ -56,4 +59,5 @@ interface SyncOutcomeOptions {
     requestedCapabilities: AgentCapability[];
     gitignoreAlerts?: string[];
     remoteSourceWarnings?: string[];
+    commentsStrippedPaths?: string[];
 }

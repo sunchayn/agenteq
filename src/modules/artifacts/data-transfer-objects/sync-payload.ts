@@ -17,6 +17,7 @@ export class SyncPayload {
     readonly boostGuidelines?: string;
     readonly remoteSources: ResolvedRemoteSource[];
     readonly remoteSourceWarnings: string[];
+    readonly commentsStrippedPaths: string[];
 
     constructor(options: SyncPayloadOptions) {
         this.context = options.context;
@@ -27,6 +28,7 @@ export class SyncPayload {
         this.boostGuidelines = options.boostGuidelines;
         this.remoteSources = options.remoteSources ?? [];
         this.remoteSourceWarnings = options.remoteSourceWarnings ?? [];
+        this.commentsStrippedPaths = options.commentsStrippedPaths ?? [];
     }
 
     wantsCapability(capability: AgentCapability): boolean {
@@ -44,10 +46,31 @@ export class SyncPayload {
             artifactPaths: [...this.artifactPaths, ...artifactPaths],
             boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
+            commentsStrippedPaths: this.commentsStrippedPaths,
             context: this.context,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: [...this.results, ...results],
+            selectedAgents: this.selectedAgents,
+        });
+    }
+
+    /**
+     * Returns a new payload with the given config file paths appended to those already reported as comment-stripped.
+     */
+    withCommentsStrippedPaths(commentsStrippedPaths: string[]): SyncPayload {
+        return new SyncPayload({
+            artifactPaths: this.artifactPaths,
+            boostGuidelines: this.boostGuidelines,
+            capabilities: this.capabilities,
+            commentsStrippedPaths: [
+                ...this.commentsStrippedPaths,
+                ...commentsStrippedPaths,
+            ],
+            context: this.context,
+            remoteSources: this.remoteSources,
+            remoteSourceWarnings: this.remoteSourceWarnings,
+            results: this.results,
             selectedAgents: this.selectedAgents,
         });
     }
@@ -60,6 +83,7 @@ export class SyncPayload {
             artifactPaths: this.artifactPaths,
             boostGuidelines: boostGuidelines,
             capabilities: this.capabilities,
+            commentsStrippedPaths: this.commentsStrippedPaths,
             context: this.context,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
@@ -76,6 +100,7 @@ export class SyncPayload {
             artifactPaths: this.artifactPaths,
             boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
+            commentsStrippedPaths: this.commentsStrippedPaths,
             context: this.context,
             remoteSources: remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
@@ -93,6 +118,7 @@ export class SyncPayload {
             artifactPaths: this.artifactPaths,
             boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
+            commentsStrippedPaths: this.commentsStrippedPaths,
             context: this.context,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: [...this.remoteSourceWarnings, warning],
@@ -122,4 +148,5 @@ interface SyncPayloadOptions {
     boostGuidelines?: string;
     remoteSources?: ResolvedRemoteSource[];
     remoteSourceWarnings?: string[];
+    commentsStrippedPaths?: string[];
 }
