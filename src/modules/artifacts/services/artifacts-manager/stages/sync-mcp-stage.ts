@@ -118,9 +118,10 @@ async function installMcpServers(
     });
 
     const artifactPaths: string[] = [];
+    const { isDryRun } = payload.context;
 
     for (const [filePath, write] of writesByFile) {
-        const statusesByKey = await processFile(filePath, write);
+        const statusesByKey = await processFile(filePath, write, isDryRun);
 
         for (const agentDisplayName of write.agentDisplayNames) {
             for (const [key, status] of statusesByKey) {
@@ -136,7 +137,11 @@ async function installMcpServers(
         const relPath = relative(cwd, filePath);
 
         // Gitignore every resolved config path, even one left unwritten this run because its content already matched.
-        await git.ignore({ cwd: cwd, relPath: relPath });
+        // A dry run only reports the status, it never touches .gitignore.
+        if (!isDryRun) {
+            await git.ignore({ cwd: cwd, relPath: relPath });
+        }
+
         artifactPaths.push(relPath);
     }
 
@@ -213,12 +218,13 @@ function detectFormat(filePath: string): ConfigFileFormat {
 
 /**
  * Reads one file once, reconciles its servers map against the canonical set,
- * and writes it back only if that actually changed it.
- * Returns the resulting status of every key that changed.
+ * and writes it back only if that actually changed it and this isn't a dry run.
+ * Returns the resulting status of every key that changed, which a dry run reports without writing.
  */
 async function processFile(
     filePath: string,
     write: PendingMcpWrite,
+    isDryRun: boolean | undefined,
 ): Promise<Map<string, SyncStatus>> {
     const format = detectFormat(filePath);
     const originalText = (await filesystem.readFile(filePath)) ?? "";
@@ -230,7 +236,7 @@ async function processFile(
         text: originalText,
     });
 
-    if (text === originalText) {
+    if (text === originalText || isDryRun) {
         return statusesByKey;
     }
 

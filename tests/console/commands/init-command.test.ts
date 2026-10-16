@@ -301,6 +301,44 @@ describe("agenteq init: non-interactive fallback", () => {
     });
 });
 
+describe("agenteq init: --dry-run", () => {
+    it("reports what would happen without persisting the agents file", async () => {
+        detectAgentsMock.mockResolvedValue(detected([claudeCode, true]));
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "init",
+            "--yes",
+            "--json",
+            "--dry-run",
+        ]);
+
+        expect(await readAgentsFile(context)).toBeUndefined();
+        expect(process.exitCode).toBeFalsy();
+    });
+
+    it("leaves an existing agents file untouched", async () => {
+        await saveAgentsFileAction({
+            agentNames: ["cursor"],
+            capabilities: Object.values(AgentCapability),
+            context: context,
+        });
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "init",
+            "--agents",
+            "claude_code",
+            "--json",
+            "--dry-run",
+        ]);
+
+        expect(await readAgentsFile(context)).toEqual(["cursor"]);
+    });
+});
+
 describe("agenteq init: --skip-in-ci", () => {
     it("does nothing when run in CI with --skip-in-ci", async () => {
         isCIMock.mockReturnValue(true);

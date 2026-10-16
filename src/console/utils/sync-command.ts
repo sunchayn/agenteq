@@ -14,6 +14,7 @@ export function resolveCommonSyncOptions(
         agents: rawAgents
             ? rawAgents.split(",").map((name) => name.trim())
             : [],
+        isDryRun: options.dryRun ?? env.readFlag("AGENTEQ_DRY_RUN"),
         isJson: options.json ?? env.readFlag("AGENTEQ_JSON"),
         only: options.only ?? env.readString("AGENTEQ_ONLY"),
         shouldSkipInCi: options.skipInCi ?? env.readFlag("AGENTEQ_SKIP_IN_CI"),
@@ -33,9 +34,10 @@ export function resolveCommonSyncOptions(
 
 export type ResolvedSyncOptions = Omit<
     RawSyncOptions,
-    "agents" | "json" | "yes" | "skipInCi" | "updatePins"
+    "agents" | "json" | "yes" | "skipInCi" | "updatePins" | "dryRun"
 > & {
     agents: string[];
+    isDryRun: boolean;
     isJson: boolean;
     shouldSkipInCi: boolean;
     shouldSkipPrompts: boolean;

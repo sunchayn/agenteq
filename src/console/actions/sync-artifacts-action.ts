@@ -25,17 +25,21 @@ export default async function syncArtifactsAction(
     } = options;
 
     if (!isJson) {
-        output.intro(label);
+        output.intro(context.isDryRun ? `${label} (dry run)` : label);
     }
 
-    await ensureRemoteClonePathsAction({
-        context: context,
-        shouldSkipPrompts: shouldSkipPrompts,
-    });
+    // A dry run only resolves and reports, it never saves a clone path prompt answer or re-pins a remote source.
+    if (!context.isDryRun) {
+        await ensureRemoteClonePathsAction({
+            context: context,
+            shouldSkipPrompts: shouldSkipPrompts,
+        });
+    }
 
-    const updatePinWarnings = shouldUpdatePins
-        ? await updateRemoteSourcePinsAction({ context: context })
-        : [];
+    const updatePinWarnings =
+        shouldUpdatePins && !context.isDryRun
+            ? await updateRemoteSourcePinsAction({ context: context })
+            : [];
 
     const outcome = await artifactsManager.sync({
         capabilities: capabilities,
@@ -52,6 +56,7 @@ export default async function syncArtifactsAction(
               ]);
 
     printSyncOutcome({
+        isDryRun: context.isDryRun,
         isJson: isJson,
         outcome: outcomeWithPinWarnings,
     });

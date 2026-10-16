@@ -33,6 +33,7 @@ interface WriteGuidelinesOptions {
     guidelinesPath: string;
     targetCwd: string;
     boostGuidelines?: string;
+    isDryRun?: boolean;
 }
 
 interface SyncAgentsResult {
@@ -95,6 +96,7 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         const { detail, status } = await writeGuidelines({
             boostGuidelines: payload.boostGuidelines,
             guidelinesPath: agent.guidelinesPath,
+            isDryRun: payload.context.isDryRun,
             remoteSourcePaths: remoteSourcePaths,
             remoteUrls: remoteUrls,
             sourcePath: source,
@@ -102,10 +104,13 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         });
 
         if (status === SyncStatus.Written) {
-            await git.ignore({
-                cwd: payload.context.cwd,
-                relPath: agent.guidelinesPath,
-            });
+            // A dry run only reports the status, it never touches .gitignore.
+            if (!payload.context.isDryRun) {
+                await git.ignore({
+                    cwd: payload.context.cwd,
+                    relPath: agent.guidelinesPath,
+                });
+            }
 
             artifactPaths.push(agent.guidelinesPath);
         }
@@ -125,6 +130,7 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
 /**
  * Writes the canonical guidelines file into one agent's guidelines path.
  * Always a real file, never a symlink, the written content never matches the source (some content is dynamic).
+ * A dry run builds the same content to validate it, but skips the actual write.
  */
 async function writeGuidelines(
     options: WriteGuidelinesOptions,
@@ -132,6 +138,7 @@ async function writeGuidelines(
     const {
         boostGuidelines,
         guidelinesPath,
+        isDryRun,
         remoteSourcePaths,
         remoteUrls,
         sourcePath,
@@ -160,9 +167,11 @@ async function writeGuidelines(
 
         const content = `${remoteBlock}${raw}${boostBlock}${guidelinesSuffix({ remoteUrls: remoteUrls })}`;
 
-        await filesystem.mkdir(dirname(target));
+        if (!isDryRun) {
+            await filesystem.mkdir(dirname(target));
 
-        await filesystem.writeFile({ content: content, path: target });
+            await filesystem.writeFile({ content: content, path: target });
+        }
 
         return { status: SyncStatus.Written };
     } catch (error) {

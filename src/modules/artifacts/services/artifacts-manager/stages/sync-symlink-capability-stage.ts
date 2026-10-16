@@ -37,6 +37,7 @@ interface MirrorDirOptions {
     targetDir: string;
     renameFile?: (file: string) => string;
     filterFiles?: (file: string) => boolean;
+    isDryRun?: boolean;
 }
 
 interface SyncAgentsResult {
@@ -60,6 +61,7 @@ interface SyncOneAgentOptions {
     cwd: string;
     sourceDirs: SourceDir[];
     targetRelDir: string;
+    isDryRun?: boolean;
 }
 
 interface SyncOneAgentResult {
@@ -76,9 +78,13 @@ async function syncAgents(
     payload: SyncPayload,
 ): Promise<SyncAgentsResult> {
     const sourceDirs = sourceDirsFor(capability, payload);
+    const { isDryRun } = payload.context;
 
     // Runs before the early return below, since a removed remote source leaves nothing else to sync.
-    await pruneOrphanedRemoteSymlinks(capability, payload);
+    // Skipped during a dry run, which never removes a symlink from disk.
+    if (!isDryRun) {
+        await pruneOrphanedRemoteSymlinks(capability, payload);
+    }
 
     const hasAnySource = (
         await Promise.all(
@@ -111,6 +117,7 @@ async function syncAgents(
             agent: agent,
             capability: capability,
             cwd: payload.context.cwd,
+            isDryRun: isDryRun,
             sourceDirs: sourceDirs,
             targetRelDir: targetRelDir,
         });
@@ -118,10 +125,13 @@ async function syncAgents(
         results.push(result);
 
         if (result.status === SyncStatus.Written && fileCount > 0) {
-            await git.ignore({
-                cwd: payload.context.cwd,
-                relPath: targetRelDir,
-            });
+            // A dry run only reports the status, it never touches .gitignore.
+            if (!isDryRun) {
+                await git.ignore({
+                    cwd: payload.context.cwd,
+                    relPath: targetRelDir,
+                });
+            }
 
             artifactPaths.push(targetRelDir);
         }
@@ -155,7 +165,8 @@ async function pruneOrphanedRemoteSymlinks(
 async function syncOneAgent(
     options: SyncOneAgentOptions,
 ): Promise<SyncOneAgentResult> {
-    const { agent, capability, cwd, sourceDirs, targetRelDir } = options;
+    const { agent, capability, cwd, isDryRun, sourceDirs, targetRelDir } =
+        options;
 
     const targetDir = join(cwd, targetRelDir);
 
@@ -181,6 +192,7 @@ async function syncOneAgent(
                     sourceDir.selection,
                     claimedNames,
                 ),
+                isDryRun: isDryRun,
                 renameFile: renameFile,
                 sourceDir: sourceDir.dir,
                 targetDir: targetDir,
@@ -344,16 +356,19 @@ function targetDirFor(
 /**
  * Mirrors every source file into the target directory via symlinks, optionally filtered.
  * Returns the list of files actually mirrored. A source directory that does not exist mirrors nothing.
+ * A dry run still globs and filters the source to report an accurate file count, but never touches the target.
  */
 async function mirrorDir(options: MirrorDirOptions): Promise<string[]> {
-    const { filterFiles, renameFile, sourceDir, targetDir } = options;
+    const { filterFiles, isDryRun, renameFile, sourceDir, targetDir } = options;
 
-    // Only symlinks pointing into sourceDir are cleared before repopulating,
-    // so a real file the agent or the user placed in targetDir is left untouched.
-    await filesystem.removeSymlinksInto({
-        sourceDir: sourceDir,
-        targetDir: targetDir,
-    });
+    if (!isDryRun) {
+        // Only symlinks pointing into sourceDir are cleared before repopulating,
+        // so a real file the agent or the user placed in targetDir is left untouched.
+        await filesystem.removeSymlinksInto({
+            sourceDir: sourceDir,
+            targetDir: targetDir,
+        });
+    }
 
     const allFiles = await filesystem.glob({
         cwd: sourceDir,
@@ -364,12 +379,15 @@ async function mirrorDir(options: MirrorDirOptions): Promise<string[]> {
 
     const files = filterFiles ? allFiles.filter(filterFiles) : allFiles;
 
-    for (const file of files) {
-        const link = join(targetDir, renameFile ? renameFile(file) : file);
-        const source = join(sourceDir, file);
+    if (!isDryRun) {
+        for (const file of files) {
+            const link = join(targetDir, renameFile ? renameFile(file) : file);
 
-        await filesystem.mkdir(dirname(link));
-        await filesystem.symlinkOrCopy({ source: source, target: link });
+            const source = join(sourceDir, file);
+
+            await filesystem.mkdir(dirname(link));
+            await filesystem.symlinkOrCopy({ source: source, target: link });
+        }
     }
 
     return files;

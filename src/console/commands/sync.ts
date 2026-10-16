@@ -54,6 +54,10 @@ export function registerSyncCommand(program: Command): void {
             "--update-pins",
             "re-pin every pinned remote source to its newest release before syncing (env: AGENTEQ_UPDATE_PINS)",
         )
+        .option(
+            "--dry-run",
+            "resolve and print what would be written, skipped, or removed, without touching disk or .gitignore (env: AGENTEQ_DRY_RUN)",
+        )
         .action(async (rawOptions: RawSyncOptions) => {
             const options = resolveCommonSyncOptions(rawOptions);
 
@@ -69,6 +73,7 @@ export function registerSyncCommand(program: Command): void {
 
             const context = {
                 cwd: process.cwd(),
+                isDryRun: options.isDryRun,
                 sourceDir: options.sourceDir,
             };
 
@@ -119,9 +124,11 @@ export function registerSyncCommand(program: Command): void {
             });
 
             // Reflect the user's choice with the command arguments on the saved agents file for future uses.
+            // Skipped entirely during a dry run, which reports what would happen without writing anything.
             if (
-                userProvidedAgentListExplicitly ||
-                userProvidedCapabilitiesListExplicitly
+                (userProvidedAgentListExplicitly ||
+                    userProvidedCapabilitiesListExplicitly) &&
+                !options.isDryRun
             ) {
                 await saveAgentsFileAction({
                     agentNames: agents.map((agent) => agent.name),

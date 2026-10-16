@@ -10,7 +10,7 @@ import { renderAsJson, TableData } from "@console/utils/console.js";
  * Prints a sync run's outcome, as a plain-text table or as JSON.
  */
 export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
-    const { isJson, outcome } = options;
+    const { isDryRun = false, isJson, outcome } = options;
 
     const {
         gitignoreAlerts,
@@ -24,6 +24,7 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
     if (isJson) {
         output.writeRaw(
             renderAsJson({
+                dryRun: isDryRun,
                 failed: hasFailed,
                 gitignoreAlerts: gitignoreAlerts,
                 remoteSourceWarnings: remoteSourceWarnings,
@@ -45,12 +46,12 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
         );
 
         printSkippedCapabilitiesNote(skippedCapabilities);
-        printOutSyncCompleted();
+        printOutSyncCompleted(isDryRun);
 
         return;
     }
 
-    const { headers, rows } = renderAsTable(results);
+    const { headers, rows } = renderAsTable(results, isDryRun);
 
     output.table(headers, rows);
 
@@ -62,20 +63,26 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
 
     if (hasFailed) {
         printFailureDetailsForEachResult(results);
-        printOutSyncCompletedWithFailure();
+        printOutSyncCompletedWithFailure(isDryRun);
 
         return;
     }
 
-    printOutSyncCompleted();
+    printOutSyncCompleted(isDryRun);
 }
 
-function printOutSyncCompleted(): void {
-    output.outro("Sync complete.");
+function printOutSyncCompleted(isDryRun: boolean): void {
+    output.outro(
+        isDryRun ? "Dry run complete. Nothing was written." : "Sync complete.",
+    );
 }
 
-function printOutSyncCompletedWithFailure(): void {
-    output.outro("Sync finished with failures.");
+function printOutSyncCompletedWithFailure(isDryRun: boolean): void {
+    output.outro(
+        isDryRun
+            ? "Dry run finished with failures."
+            : "Sync finished with failures.",
+    );
 }
 
 /**
@@ -117,20 +124,32 @@ function printGitignoreAlert(gitignoreAlerts: string[]): void {
 interface PrintSyncOutcomeOptions {
     outcome: SyncOutcome;
     isJson?: boolean;
+    isDryRun?: boolean;
 }
 
 /*
  * Internal.
  */
 
-function renderAsTable(results: SyncResult[]): TableData {
+/**
+ * The table wording for a status that represents a disk mutation, when run as a dry run.
+ * `Unsupported` and `Failed` are not disk mutations, so they render the same either way.
+ */
+const DRY_RUN_STATUS_LABELS: Partial<Record<SyncStatus, string>> = {
+    [SyncStatus.Removed]: "would remove",
+    [SyncStatus.Written]: "would write",
+};
+
+function renderAsTable(results: SyncResult[], isDryRun: boolean): TableData {
     return {
         headers: ["Agent", "Capability", "Item", "Status"],
         rows: results.map((result) => [
             result.agent,
             result.capability,
             result.item,
-            result.status,
+            isDryRun
+                ? (DRY_RUN_STATUS_LABELS[result.status] ?? result.status)
+                : result.status,
         ]),
     };
 }
