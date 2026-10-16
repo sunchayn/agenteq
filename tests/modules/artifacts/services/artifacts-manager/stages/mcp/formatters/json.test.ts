@@ -151,4 +151,37 @@ describe("jsonFormatter", () => {
         expect(result.statusesByKey.size).toBe(0);
         expect(result.text).toBe(conflictingText);
     });
+
+    it("reports no stripped comments for a plain JSON file", () => {
+        const result = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [server],
+            text: JSON.stringify({ mcpServers: {} }),
+        });
+
+        expect(result.hadComments).toBe(false);
+    });
+
+    it("parses a file with comments and trailing commas, reporting that it had to", () => {
+        const jsoncText = `{
+            // a line comment
+            "mcpServers": {
+                "hand-added": { "command": "something-else" }, /* trailing comma above */
+            },
+        }`;
+
+        const result = jsonFormatter.reconcile({
+            keyPath: ["mcpServers"],
+            mapper: mapServer,
+            servers: [server],
+            text: jsoncText,
+        });
+
+        expect(result.hadComments).toBe(true);
+        expect(JSON.parse(result.text).mcpServers.example).toEqual({
+            args: ["-y", "example"],
+            command: "npx",
+        });
+    });
 });

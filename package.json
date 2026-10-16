@@ -59,6 +59,7 @@
         "@clack/prompts": "^1.7.0",
         "commander": "^12.1.0",
         "fast-glob": "^3.3.3",
+        "jsonc-parser": "^3.3.1",
         "picocolors": "^1.1.1",
         "smol-toml": "^1.7.1",
         "yaml": "^2.9.0",
@@ -75,8 +76,8 @@
         "tsx": "^4.23.11",
         "typescript": "^5.7.2",
         "typescript-eslint": "^8.18.0",
-        "vitest": "^4.1.10",
-        "vite-tsconfig-paths": "^6.1.1"
+        "vite-tsconfig-paths": "^6.1.1",
+        "vitest": "^4.1.10"
     },
     "overrides": {
         "vite": "^7.3.6"

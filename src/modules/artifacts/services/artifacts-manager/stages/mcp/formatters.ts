@@ -4,13 +4,16 @@ import type { McpServer } from "@agents/entities/mcp-server.js";
 import type { McpServerMapper } from "@agents/types/mcp-server-mapper.js";
 import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
+import { parseLenientJson } from "@support/utils/parse-lenient-json.js";
 
 /**
  * Reconciles a JSON file's servers map against the servers given.
+ * Tolerates comments and trailing commas, so a file such as Kilo's kilo.jsonc still parses,
+ * and reports that fallback so the file's comments don't get dropped silently once it's rewritten.
  */
 export const jsonFormatter: McpFormatter = {
     format: ConfigFileFormat.Json,
-    reconcile: (options) => reconcileText(options, JSON.parse, toJsonText),
+    reconcile: (options) => reconcileJsonText(options),
 };
 
 /**
@@ -18,7 +21,10 @@ export const jsonFormatter: McpFormatter = {
  */
 export const tomlFormatter: McpFormatter = {
     format: ConfigFileFormat.Toml,
-    reconcile: (options) => reconcileText(options, parseToml, stringifyToml),
+    reconcile: (options) => ({
+        ...reconcileText(options, parseToml, stringifyToml),
+        hadComments: false,
+    }),
 };
 
 /**
@@ -26,7 +32,10 @@ export const tomlFormatter: McpFormatter = {
  */
 export const yamlFormatter: McpFormatter = {
     format: ConfigFileFormat.Yaml,
-    reconcile: (options) => reconcileText(options, parseYaml, stringifyYaml),
+    reconcile: (options) => ({
+        ...reconcileText(options, parseYaml, stringifyYaml),
+        hadComments: false,
+    }),
 };
 
 /*
@@ -53,6 +62,11 @@ export interface FormatReconcileResult {
      * Removed for a key that was there, but is no longer among the servers given.
      */
     statusesByKey: Map<string, SyncStatus>;
+    /**
+     * True when the file's text needed the comment-tolerant parse instead of strict JSON.parse.
+     * Always false for TOML and YAML, which have no such fallback.
+     */
+    hadComments: boolean;
 }
 
 /*
@@ -64,6 +78,30 @@ function toJsonText(doc: Record<string, unknown>): string {
 }
 
 /**
+ * Reconciles a JSON file's servers map.
+ * Tracks whether its text needed the comment-tolerant parse instead of strict JSON.parse.
+ */
+function reconcileJsonText(
+    options: ReconcileFormatOptions,
+): FormatReconcileResult {
+    let hadComments = false;
+
+    const result = reconcileText(
+        options,
+        (text) => {
+            const parsed = parseLenientJson(text);
+
+            hadComments = parsed.hadComments;
+
+            return parsed.value;
+        },
+        toJsonText,
+    );
+
+    return { ...result, hadComments: hadComments };
+}
+
+/**
  * Reconciles the object at a config file's key path against the servers given.
  * Every key at that path not among those servers is dropped, agenteq owns that whole map.
  * Sibling keys outside the key path, such as an agent's other settings, are left untouched.
@@ -72,7 +110,7 @@ function reconcileText(
     options: ReconcileFormatOptions,
     parse: (text: string) => unknown,
     stringify: (doc: Record<string, unknown>) => string,
-): FormatReconcileResult {
+): Omit<FormatReconcileResult, "hadComments"> {
     const { keyPath, mapper, servers, text } = options;
 
     const parsed = text ? parse(text) : {};

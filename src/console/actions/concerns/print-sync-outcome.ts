@@ -13,6 +13,7 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
     const { isJson, outcome } = options;
 
     const {
+        commentsStrippedPaths,
         gitignoreAlerts,
         hasFailed,
         remoteSourceWarnings,
@@ -24,6 +25,7 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
     if (isJson) {
         output.writeRaw(
             renderAsJson({
+                commentsStrippedPaths: commentsStrippedPaths,
                 failed: hasFailed,
                 gitignoreAlerts: gitignoreAlerts,
                 remoteSourceWarnings: remoteSourceWarnings,
@@ -55,6 +57,10 @@ export function printSyncOutcome(options: PrintSyncOutcomeOptions): void {
     output.table(headers, rows);
 
     printSkippedCapabilitiesNote(skippedCapabilities);
+
+    if (commentsStrippedPaths.length > 0) {
+        printCommentsStrippedAlert(commentsStrippedPaths);
+    }
 
     if (gitignoreAlerts.length > 0) {
         printGitignoreAlert(gitignoreAlerts);
@@ -94,6 +100,18 @@ function printSkippedCapabilitiesNote(skipped: AgentCapability[]): void {
 
     output.info(
         `Run \`init\` or pass \`--only {capabilities}\` to update the list of capabilities.`,
+    );
+}
+
+/**
+ * Warns that some agent config files had comments or trailing commas stripped on read.
+ * Writing the file back loses that formatting, so the user should know it happened.
+ */
+function printCommentsStrippedAlert(commentsStrippedPaths: string[]): void {
+    const list = commentsStrippedPaths.join("\n");
+
+    output.warn(
+        `Comments and trailing commas were stripped while reading these config files, and will not be restored on write:\n\n${list}`,
     );
 }
 

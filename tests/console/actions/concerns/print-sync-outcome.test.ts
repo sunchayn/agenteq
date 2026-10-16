@@ -124,6 +124,30 @@ describe("printSyncOutcome: gitignore alerts", () => {
     });
 });
 
+describe("printSyncOutcome: comments stripped alert", () => {
+    it("warns with every path whose comments were stripped on read", () => {
+        vi.spyOn(output, "table").mockImplementation(() => undefined);
+        vi.spyOn(output, "outro").mockImplementation(() => undefined);
+
+        const warnSpy = vi
+            .spyOn(output, "warn")
+            .mockImplementation(() => undefined);
+
+        printSyncOutcome({
+            outcome: new SyncOutcome({
+                commentsStrippedPaths: [".mcp.json"],
+                requestedCapabilities: Object.values(AgentCapability),
+                results: [row(SyncStatus.Written)],
+                sourceDir: ".ai",
+            }),
+        });
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining(".mcp.json"),
+        );
+    });
+});
+
 describe("printSyncOutcome: remote source warnings", () => {
     it("warns with each remote source warning before rendering the table", () => {
         vi.spyOn(output, "table").mockImplementation(() => undefined);
