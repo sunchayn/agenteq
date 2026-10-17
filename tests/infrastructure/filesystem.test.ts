@@ -170,3 +170,41 @@ describe("filesystem.removeSymlinksInto", () => {
         ).resolves.toBeUndefined();
     });
 });
+
+describe("filesystem.findBrokenSymlinks", () => {
+    it("returns a symlink whose target no longer exists", async () => {
+        await symlink(join(cwd, "does-not-exist.md"), join(cwd, "broken.md"));
+
+        expect(await filesystem.findBrokenSymlinks(cwd)).toEqual(["broken.md"]);
+    });
+
+    it("does not report a symlink that still resolves", async () => {
+        await writeFile(join(cwd, "a.md"), "hello");
+        await symlink(join(cwd, "a.md"), join(cwd, "linked.md"));
+
+        expect(await filesystem.findBrokenSymlinks(cwd)).toEqual([]);
+    });
+
+    it("does not report a real file", async () => {
+        await writeFile(join(cwd, "a.md"), "hello");
+
+        expect(await filesystem.findBrokenSymlinks(cwd)).toEqual([]);
+    });
+
+    it("finds a broken symlink nested in a subdirectory", async () => {
+        const nested = join(cwd, "nested");
+
+        await mkdir(nested, { recursive: true });
+        await symlink(join(nested, "gone.md"), join(nested, "broken.md"));
+
+        expect(await filesystem.findBrokenSymlinks(cwd)).toEqual([
+            join("nested", "broken.md"),
+        ]);
+    });
+
+    it("returns an empty list when the directory doesn't exist", async () => {
+        expect(
+            await filesystem.findBrokenSymlinks(join(cwd, "missing")),
+        ).toEqual([]);
+    });
+});

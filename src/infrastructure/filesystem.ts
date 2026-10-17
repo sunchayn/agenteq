@@ -19,6 +19,7 @@ import fg from "fast-glob";
 export default {
     copy: copy,
     exists: exists,
+    findBrokenSymlinks: findBrokenSymlinks,
     glob: glob,
     mkdir: mkdir,
     readFile: readFile,
@@ -181,6 +182,52 @@ async function pruneSymlinksInto(
             await rm(entryPath, { force: true });
         }
     }
+}
+
+/**
+ * Walks dir recursively and returns every symlink, relative to dir, whose target does not resolve.
+ */
+async function findBrokenSymlinks(dir: string): Promise<string[]> {
+    return collectBrokenSymlinks(dir, dir);
+}
+
+async function collectBrokenSymlinks(
+    dir: string,
+    root: string,
+): Promise<string[]> {
+    let entries;
+
+    try {
+        entries = await readdir(dir, { withFileTypes: true });
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            return [];
+        }
+
+        throw error;
+    }
+
+    const broken: string[] = [];
+
+    for (const entry of entries) {
+        const entryPath = join(dir, entry.name);
+
+        if (entry.isSymbolicLink()) {
+            // access() follows a symlink, so it fails the same way whether the link is broken itself,
+            // or whether it points at a target that no longer exists.
+            if (!(await exists(entryPath))) {
+                broken.push(relative(root, entryPath));
+            }
+
+            continue;
+        }
+
+        if (entry.isDirectory()) {
+            broken.push(...(await collectBrokenSymlinks(entryPath, root)));
+        }
+    }
+
+    return broken;
 }
 
 /**

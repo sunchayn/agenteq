@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { registerDetectCommand } from "@console/commands/detect.js";
+import { registerDoctorCommand } from "@console/commands/doctor.js";
 import { registerInitCommand } from "@console/commands/init.js";
 import { registerSyncCommand } from "@console/commands/sync.js";
 import { registerRemoteSourceCommand } from "@console/commands/remote-source.js";
@@ -37,6 +38,7 @@ program
     });
 
 registerDetectCommand(program);
+registerDoctorCommand(program);
 registerInitCommand(program);
 registerSyncCommand(program);
 registerRemoteSourceCommand(program);
