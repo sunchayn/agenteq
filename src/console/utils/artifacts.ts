@@ -54,6 +54,38 @@ export async function resolveCapabilitiesToSync(
 }
 
 /**
+ * Resolves whether to sync in copy mode, using the following order.
+ *     1. from --copy
+ *     2. then the saved agents file
+ *     3. then a default of false
+ *
+ * Also reports whether the result needs to be persisted back to the saved agents file.
+ */
+export async function resolveCopyModeToSync(
+    options: ResolveCopyModeOptions,
+): Promise<{
+    isCopyMode: boolean;
+    isDirty: boolean;
+}> {
+    const { context, copyFlag } = options;
+
+    if (copyFlag !== undefined) {
+        // An explicit --copy flag always needs saving, it did not come from the file.
+        return { isCopyMode: copyFlag, isDirty: true };
+    }
+
+    const saved = await loadAgentsFileAction({ context: context });
+
+    if (saved?.isCopyMode !== undefined) {
+        // Reusing a value already in the saved file does not need to be written back.
+        return { isCopyMode: saved.isCopyMode, isDirty: false };
+    }
+
+    // No flag and nothing saved, so this default is freshly established and needs saving.
+    return { isCopyMode: false, isDirty: true };
+}
+
+/**
  * Parses the comma-separated `--only` flag into a validated Capability list,
  * defaulting to every capability when the flag is absent.
  */
@@ -88,4 +120,9 @@ function parseCapabilities(only?: string): AgentCapability[] {
 export interface ResolveCapabilitiesOptions {
     context: RunContext;
     only: string | undefined;
+}
+
+export interface ResolveCopyModeOptions {
+    context: RunContext;
+    copyFlag: boolean | undefined;
 }

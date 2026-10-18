@@ -8,7 +8,10 @@ import artifactsManager from "@artifacts/services/artifacts-manager/index.js";
 import syncArtifactsAction from "@console/actions/sync-artifacts-action.js";
 import { runInit } from "@console/commands/init.js";
 import { printMessage } from "@console/utils/console.js";
-import { resolveCapabilitiesToSync } from "@console/utils/artifacts.js";
+import {
+    resolveCapabilitiesToSync,
+    resolveCopyModeToSync,
+} from "@console/utils/artifacts.js";
 import { resolveCommonSyncOptions } from "@console/utils/sync-command.js";
 import type { RunContext } from "@shared/types/run-context.js";
 import type Agent from "@agents/entities/agent.js";
@@ -61,6 +64,10 @@ export function registerSyncCommand(program: Command): void {
         .option(
             "--force",
             "overwrite an artifact even if it was hand-edited since the last sync (env: AGENTEQ_FORCE)",
+        )
+        .option(
+            "--copy",
+            "materialize commands and skills as real file copies instead of symlinks (env: AGENTEQ_COPY)",
         )
         .action(async (rawOptions: RawSyncOptions) => {
             const options = resolveCommonSyncOptions(rawOptions);
@@ -127,17 +134,25 @@ export function registerSyncCommand(program: Command): void {
                 only: options.only,
             });
 
+            const { isCopyMode, isDirty: userProvidedCopyModeExplicitly } =
+                await resolveCopyModeToSync({
+                    context: context,
+                    copyFlag: options.copyFlag,
+                });
+
             // Reflect the user's choice with the command arguments on the saved agents file for future uses.
             // Skipped entirely during a dry run, which reports what would happen without writing anything.
             if (
                 (userProvidedAgentListExplicitly ||
-                    userProvidedCapabilitiesListExplicitly) &&
+                    userProvidedCapabilitiesListExplicitly ||
+                    userProvidedCopyModeExplicitly) &&
                 !options.isDryRun
             ) {
                 await saveAgentsFileAction({
                     agentNames: agents.map((agent) => agent.name),
                     capabilities: capabilities,
                     context: context,
+                    isCopyMode: isCopyMode,
                 });
             }
 
@@ -145,6 +160,7 @@ export function registerSyncCommand(program: Command): void {
                 agents: agents,
                 capabilities: capabilities,
                 context: context,
+                isCopyMode: isCopyMode,
                 isJson: options.isJson,
                 label: "agenteq sync",
                 shouldForce: options.shouldForce,

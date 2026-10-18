@@ -35,7 +35,8 @@ export default {
  * Pass `shouldForce` to overwrite anyway.
  */
 async function sync(options: SyncOptions): Promise<SyncOutcome> {
-    const { capabilities, context, selectedAgents, shouldForce } = options;
+    const { capabilities, context, isCopyMode, selectedAgents, shouldForce } =
+        options;
 
     if (!shouldForce) {
         await guardAgainstHandEditedArtifacts(context);
@@ -44,6 +45,7 @@ async function sync(options: SyncOptions): Promise<SyncOutcome> {
     let payload = new SyncPayload({
         capabilities: capabilities,
         context: context,
+        isCopyMode: isCopyMode,
         selectedAgents: selectedAgents,
     });
 
@@ -109,5 +111,6 @@ interface SyncOptions {
     context: RunContext;
     selectedAgents: Agent[];
     capabilities: AgentCapability[];
+    isCopyMode?: boolean;
     shouldForce?: boolean;
 }

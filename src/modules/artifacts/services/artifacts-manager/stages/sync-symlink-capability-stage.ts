@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
 import git from "@infrastructure/git.js";
 import type Agent from "@agents/entities/agent.js";
@@ -12,6 +12,7 @@ import {
     SHARED_NAMESPACE,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import { AGENTEQ_SOURCES_ROOT } from "@support/utils/agenteq-sources-root.js";
+import saveCopiedFilesFileAction from "@artifacts/actions/save-copied-files-file-action.js";
 
 /**
  * Reusable sync stage to mirror one symlink-configured capability (commands or skills) into every selected agent.
@@ -26,7 +27,19 @@ export default async function syncSymlinkCapabilityStage(
         return payload;
     }
 
-    const { artifactPaths, results } = await syncAgents(capability, payload);
+    const { artifactPaths, copiedFilePaths, mirroredFilePaths, results } =
+        await syncAgents(capability, payload);
+
+    // Scoped to this one capability, so a sync run that never requested it, e.g. --only mcp,
+    // never reconciles or removes a copy recorded under a different capability.
+    if (!payload.context.isDryRun) {
+        await saveCopiedFilesFileAction({
+            capability: capability,
+            context: payload.context,
+            copiedFilePaths: copiedFilePaths,
+            mirroredFilePaths: mirroredFilePaths,
+        });
+    }
 
     return payload.withResults(results, artifactPaths);
 }
@@ -40,12 +53,21 @@ interface MirrorDirOptions {
     targetDir: string;
     renameFile?: (file: string) => string;
     filterFiles?: (file: string) => boolean;
+    isCopyMode?: boolean;
     isDryRun?: boolean;
+}
+
+interface MirrorDirResult {
+    files: string[];
+    copiedTargetPaths: string[];
+    mirroredTargetPaths: string[];
 }
 
 interface SyncAgentsResult {
     results: SyncResult[];
     artifactPaths: string[];
+    copiedFilePaths: string[];
+    mirroredFilePaths: string[];
 }
 
 /**
@@ -62,6 +84,7 @@ interface SyncOneAgentOptions {
     agent: Agent;
     capability: AgentCapability.Commands | AgentCapability.Skills;
     cwd: string;
+    isCopyMode: boolean;
     sourceDirs: SourceDir[];
     targetRelDir: string;
     isDryRun?: boolean;
@@ -70,6 +93,8 @@ interface SyncOneAgentOptions {
 interface SyncOneAgentResult {
     result: SyncResult;
     fileCount: number;
+    copiedFilePaths: string[];
+    mirroredFilePaths: string[];
 }
 
 /*
@@ -82,6 +107,7 @@ async function syncAgents(
 ): Promise<SyncAgentsResult> {
     const sourceDirs = sourceDirsFor(capability, payload);
     const { isDryRun } = payload.context;
+    const { isCopyMode } = payload;
 
     // Runs before the early return below, since a removed remote source leaves nothing else to sync.
     // Skipped during a dry run, which never removes a symlink from disk.
@@ -96,11 +122,18 @@ async function syncAgents(
     ).some(Boolean);
 
     if (!hasAnySource) {
-        return { artifactPaths: [], results: [] };
+        return {
+            artifactPaths: [],
+            copiedFilePaths: [],
+            mirroredFilePaths: [],
+            results: [],
+        };
     }
 
     const results: SyncResult[] = [];
     const artifactPaths: string[] = [];
+    const copiedFilePaths: string[] = [];
+    const mirroredFilePaths: string[] = [];
 
     for (const agent of payload.selectedAgents) {
         const targetRelDir = targetDirFor(capability, agent);
@@ -116,16 +149,24 @@ async function syncAgents(
             continue;
         }
 
-        const { fileCount, result } = await syncOneAgent({
+        const {
+            copiedFilePaths: agentCopiedFilePaths,
+            fileCount,
+            mirroredFilePaths: agentMirroredFilePaths,
+            result,
+        } = await syncOneAgent({
             agent: agent,
             capability: capability,
             cwd: payload.context.cwd,
+            isCopyMode: isCopyMode,
             isDryRun: isDryRun,
             sourceDirs: sourceDirs,
             targetRelDir: targetRelDir,
         });
 
         results.push(result);
+        copiedFilePaths.push(...agentCopiedFilePaths);
+        mirroredFilePaths.push(...agentMirroredFilePaths);
 
         if (result.status === SyncStatus.Written && fileCount > 0) {
             // A dry run only reports the status, it never touches .gitignore.
@@ -140,7 +181,12 @@ async function syncAgents(
         }
     }
 
-    return { artifactPaths: artifactPaths, results: results };
+    return {
+        artifactPaths: artifactPaths,
+        copiedFilePaths: copiedFilePaths,
+        mirroredFilePaths: mirroredFilePaths,
+        results: results,
+    };
 }
 
 /**
@@ -168,8 +214,15 @@ async function pruneOrphanedRemoteSymlinks(
 async function syncOneAgent(
     options: SyncOneAgentOptions,
 ): Promise<SyncOneAgentResult> {
-    const { agent, capability, cwd, isDryRun, sourceDirs, targetRelDir } =
-        options;
+    const {
+        agent,
+        capability,
+        cwd,
+        isCopyMode,
+        isDryRun,
+        sourceDirs,
+        targetRelDir,
+    } = options;
 
     const targetDir = join(cwd, targetRelDir);
 
@@ -187,29 +240,43 @@ async function syncOneAgent(
         const claimedNames = new Set<string>();
 
         let fileCount = 0;
+        const copiedFilePaths: string[] = [];
+        const mirroredFilePaths: string[] = [];
 
         for (const sourceDir of sourceDirs) {
-            const files = await mirrorDir({
-                filterFiles: buildFilesFilterFor(
-                    capability,
-                    sourceDir.selection,
-                    claimedNames,
-                ),
-                isDryRun: isDryRun,
-                renameFile: renameFile,
-                sourceDir: sourceDir.dir,
-                targetDir: targetDir,
-            });
+            const { copiedTargetPaths, files, mirroredTargetPaths } =
+                await mirrorDir({
+                    filterFiles: buildFilesFilterFor(
+                        capability,
+                        sourceDir.selection,
+                        claimedNames,
+                    ),
+                    isCopyMode: isCopyMode,
+                    isDryRun: isDryRun,
+                    renameFile: renameFile,
+                    sourceDir: sourceDir.dir,
+                    targetDir: targetDir,
+                });
 
             for (const file of files) {
                 claimedNames.add(topLevelName(file));
             }
 
             fileCount += files.length;
+
+            for (const copiedTargetPath of copiedTargetPaths) {
+                copiedFilePaths.push(relative(cwd, copiedTargetPath));
+            }
+
+            for (const mirroredTargetPath of mirroredTargetPaths) {
+                mirroredFilePaths.push(relative(cwd, mirroredTargetPath));
+            }
         }
 
         return {
+            copiedFilePaths: copiedFilePaths,
             fileCount: fileCount,
+            mirroredFilePaths: mirroredFilePaths,
             result: {
                 agent: agent.displayName,
                 capability: capability,
@@ -219,7 +286,9 @@ async function syncOneAgent(
         };
     } catch (error) {
         return {
+            copiedFilePaths: [],
             fileCount: 0,
+            mirroredFilePaths: [],
             result: {
                 agent: agent.displayName,
                 capability: capability,
@@ -377,12 +446,19 @@ function targetDirFor(
 }
 
 /**
- * Mirrors every source file into the target directory via symlinks, optionally filtered.
- * Returns the list of files actually mirrored. A source directory that does not exist mirrors nothing.
- * A dry run still globs and filters the source to report an accurate file count, but never touches the target.
+ * Mirrors every source file into the target directory, optionally filtered.
+ * Writes a symlink per file by default, or a real file copy when copy mode is requested.
+ * Returns the files mirrored and, in copy mode, the absolute target path of each copy written.
  */
-async function mirrorDir(options: MirrorDirOptions): Promise<string[]> {
-    const { filterFiles, isDryRun, renameFile, sourceDir, targetDir } = options;
+async function mirrorDir(options: MirrorDirOptions): Promise<MirrorDirResult> {
+    const {
+        filterFiles,
+        isCopyMode,
+        isDryRun,
+        renameFile,
+        sourceDir,
+        targetDir,
+    } = options;
 
     if (!isDryRun) {
         // Only symlinks pointing into sourceDir are cleared before repopulating,
@@ -401,6 +477,8 @@ async function mirrorDir(options: MirrorDirOptions): Promise<string[]> {
     });
 
     const files = filterFiles ? allFiles.filter(filterFiles) : allFiles;
+    const copiedTargetPaths: string[] = [];
+    const mirroredTargetPaths: string[] = [];
 
     if (!isDryRun) {
         for (const file of files) {
@@ -409,9 +487,28 @@ async function mirrorDir(options: MirrorDirOptions): Promise<string[]> {
             const source = join(sourceDir, file);
 
             await filesystem.mkdir(dirname(link));
-            await filesystem.symlinkOrCopy({ source: source, target: link });
+
+            // Clears whatever already sits at this exact spot, a symlink or a copy from an earlier sync.
+            // This needs to stay here to cover switching modes between copy<>symlink.
+            await filesystem.remove(link);
+
+            if (isCopyMode) {
+                await filesystem.copyFile({ source: source, target: link });
+                copiedTargetPaths.push(link);
+            } else {
+                await filesystem.symlinkOrCopy({
+                    source: source,
+                    target: link,
+                });
+            }
+
+            mirroredTargetPaths.push(link);
         }
     }
 
-    return files;
+    return {
+        copiedTargetPaths: copiedTargetPaths,
+        files: files,
+        mirroredTargetPaths: mirroredTargetPaths,
+    };
 }

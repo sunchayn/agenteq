@@ -2,7 +2,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveCapabilitiesToSync } from "@console/utils/artifacts.js";
+import {
+    resolveCapabilitiesToSync,
+    resolveCopyModeToSync,
+} from "@console/utils/artifacts.js";
 import saveAgentsFileAction from "@agents/actions/save-agents-file-action.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { CliError } from "@support/errors/cli-error.js";
@@ -141,5 +144,60 @@ describe("resolveCapabilities", () => {
                 isDirty: true,
             });
         });
+    });
+});
+
+describe("resolveCopyModeToSync", () => {
+    let cwd: string;
+    let context: RunContext;
+
+    beforeEach(async () => {
+        cwd = await mkdtemp(join(tmpdir(), "agenteq-resolve-copy-mode-"));
+        context = { cwd: cwd, sourceDir: ".ai" };
+    });
+
+    afterEach(async () => {
+        await rm(cwd, { force: true, recursive: true });
+    });
+
+    it("uses --copy over a saved agents file, marking the result dirty", async () => {
+        await saveAgentsFileAction({
+            agentNames: ["claude_code"],
+            capabilities: [AgentCapability.Guidelines],
+            context: context,
+            isCopyMode: false,
+        });
+
+        const result = await resolveCopyModeToSync({
+            context: context,
+            copyFlag: true,
+        });
+
+        expect(result).toEqual({ isCopyMode: true, isDirty: true });
+    });
+
+    it("falls back to the saved file's copy mode, marking the result clean", async () => {
+        await saveAgentsFileAction({
+            agentNames: ["claude_code"],
+            capabilities: [AgentCapability.Guidelines],
+            context: context,
+            isCopyMode: true,
+        });
+
+        const result = await resolveCopyModeToSync({
+            context: context,
+            copyFlag: undefined,
+        });
+
+        expect(result).toEqual({ isCopyMode: true, isDirty: false });
+    });
+
+    it("defaults to false, marking the result dirty, when nothing is saved", async () => {
+        const result = await resolveCopyModeToSync({
+            context: context,
+            copyFlag: undefined,
+        });
+
+        expect(result).toEqual({ isCopyMode: false, isDirty: true });
     });
 });

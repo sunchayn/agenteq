@@ -82,6 +82,33 @@ describe("filesystem.symlinkOrCopy", () => {
     });
 });
 
+describe("filesystem.copyFile", () => {
+    it("copies the source content to the target as a real file", async () => {
+        await writeFile(join(cwd, "source.txt"), "hello");
+        const target = join(cwd, "target.txt");
+
+        await filesystem.copyFile({
+            source: join(cwd, "source.txt"),
+            target: target,
+        });
+
+        expect((await lstat(target)).isSymbolicLink()).toBe(false);
+        expect(await readFile(target, "utf8")).toBe("hello");
+    });
+
+    it("replaces whatever already exists at the target path", async () => {
+        await writeFile(join(cwd, "source.txt"), "fresh");
+        await writeFile(join(cwd, "target.txt"), "stale");
+
+        await filesystem.copyFile({
+            source: join(cwd, "source.txt"),
+            target: join(cwd, "target.txt"),
+        });
+
+        expect(await readFile(join(cwd, "target.txt"), "utf8")).toBe("fresh");
+    });
+});
+
 describe("filesystem.mkdir", () => {
     it("creates nested directories", async () => {
         await filesystem.mkdir(join(cwd, "a", "b", "c"));

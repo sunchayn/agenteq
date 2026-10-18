@@ -12,13 +12,17 @@ import type { RunContext } from "@shared/types/run-context.js";
 export default async function saveAgentsFileAction(
     options: SaveAgentsFileOptions,
 ): Promise<void> {
-    const { agentNames, capabilities, context } = options;
+    const { agentNames, capabilities, context, isCopyMode } = options;
 
     const existing = await loadAgentsFileAction({ context: context });
 
     await writeAgentsFile(
         context,
-        (existing ?? AgentsFile.empty()).withAgents(agentNames, capabilities),
+        (existing ?? AgentsFile.empty()).withAgents(
+            agentNames,
+            capabilities,
+            isCopyMode,
+        ),
     );
 }
 
@@ -55,4 +59,5 @@ interface SaveAgentsFileOptions {
     context: RunContext;
     agentNames: string[];
     capabilities: AgentCapability[];
+    isCopyMode?: boolean;
 }

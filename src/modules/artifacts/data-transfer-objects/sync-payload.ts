@@ -12,6 +12,7 @@ export class SyncPayload {
     readonly context: RunContext;
     readonly selectedAgents: Agent[];
     readonly capabilities: AgentCapability[];
+    readonly isCopyMode: boolean;
     readonly results: SyncResult[];
     readonly artifactPaths: string[];
     readonly boostGuidelines?: string;
@@ -22,6 +23,7 @@ export class SyncPayload {
         this.context = options.context;
         this.selectedAgents = options.selectedAgents;
         this.capabilities = options.capabilities;
+        this.isCopyMode = options.isCopyMode ?? false;
         this.results = options.results ?? [];
         this.artifactPaths = options.artifactPaths ?? [];
         this.boostGuidelines = options.boostGuidelines;
@@ -45,6 +47,7 @@ export class SyncPayload {
             boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
             context: this.context,
+            isCopyMode: this.isCopyMode,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: [...this.results, ...results],
@@ -61,6 +64,7 @@ export class SyncPayload {
             boostGuidelines: boostGuidelines,
             capabilities: this.capabilities,
             context: this.context,
+            isCopyMode: this.isCopyMode,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: this.results,
@@ -77,6 +81,7 @@ export class SyncPayload {
             boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
             context: this.context,
+            isCopyMode: this.isCopyMode,
             remoteSources: remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: this.results,
@@ -94,6 +99,7 @@ export class SyncPayload {
             boostGuidelines: this.boostGuidelines,
             capabilities: this.capabilities,
             context: this.context,
+            isCopyMode: this.isCopyMode,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: [...this.remoteSourceWarnings, warning],
             results: this.results,
@@ -117,6 +123,7 @@ interface SyncPayloadOptions {
     context: RunContext;
     selectedAgents: Agent[];
     capabilities: AgentCapability[];
+    isCopyMode?: boolean;
     results?: SyncResult[];
     artifactPaths?: string[];
     boostGuidelines?: string;

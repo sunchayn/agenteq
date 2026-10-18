@@ -9,7 +9,10 @@ import resolveAgentsByNameAction from "@agents/actions/resolve-agents-by-name-ac
 import artifactsManager from "@artifacts/services/artifacts-manager/index.js";
 import syncArtifactsAction from "@console/actions/sync-artifacts-action.js";
 import { printMessage } from "@console/utils/console.js";
-import { resolveCapabilitiesToSync } from "@console/utils/artifacts.js";
+import {
+    resolveCapabilitiesToSync,
+    resolveCopyModeToSync,
+} from "@console/utils/artifacts.js";
 import {
     resolveCommonSyncOptions,
     type ResolvedSyncOptions,
@@ -61,6 +64,10 @@ export function registerInitCommand(program: Command): void {
             "--force",
             "overwrite an artifact even if it was hand-edited since the last sync (env: AGENTEQ_FORCE)",
         )
+        .option(
+            "--copy",
+            "materialize commands and skills as real file copies instead of symlinks (env: AGENTEQ_COPY)",
+        )
         .action(runInit);
 }
 
@@ -94,6 +101,11 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
         only: options.only,
     });
 
+    const { isCopyMode } = await resolveCopyModeToSync({
+        context: context,
+        copyFlag: options.copyFlag,
+    });
+
     if (agents.length === 0) {
         process.exitCode = 1;
 
@@ -112,6 +124,7 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
             agentNames: agents.map((agent) => agent.name),
             capabilities: capabilities,
             context: context,
+            isCopyMode: isCopyMode,
         });
     }
 
@@ -119,6 +132,7 @@ export async function runInit(rawOptions: RawSyncOptions): Promise<void> {
         agents: agents,
         capabilities: capabilities,
         context: context,
+        isCopyMode: isCopyMode,
         isJson: options.isJson,
         label: "agenteq init",
         shouldForce: options.shouldForce,

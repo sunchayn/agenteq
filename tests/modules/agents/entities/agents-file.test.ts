@@ -56,6 +56,59 @@ describe("AgentsFile#withAgents", () => {
         expect(file.agentNames).toEqual(["cursor"]);
         expect(file.capabilities).toEqual(["mcp"]);
     });
+
+    it("replaces the copy mode", () => {
+        const file = AgentsFile.of(["claude_code"], undefined).withAgents(
+            ["claude_code"],
+            undefined,
+            true,
+        );
+
+        expect(file.isCopyMode).toBe(true);
+    });
+});
+
+describe("AgentsFile copy mode", () => {
+    it("parses a saved copy mode", () => {
+        expect(
+            AgentsFile.parse('{"agents":["claude_code"],"isCopyMode":true}')
+                ?.isCopyMode,
+        ).toBe(true);
+    });
+
+    it("treats a missing `isCopyMode` field as undefined", () => {
+        expect(
+            AgentsFile.parse('{"agents":["claude_code"]}')?.isCopyMode,
+        ).toBeUndefined();
+    });
+
+    it("returns null when `isCopyMode` isn't a boolean", () => {
+        expect(
+            AgentsFile.parse('{"agents":["claude_code"],"isCopyMode":"yes"}'),
+        ).toBeNull();
+    });
+
+    it("serializes copy mode only when it was set", () => {
+        const withoutCopyMode = AgentsFile.of(["claude_code"], undefined);
+
+        expect(JSON.parse(withoutCopyMode.serialize())).not.toHaveProperty(
+            "isCopyMode",
+        );
+
+        const withCopyMode = AgentsFile.of(["claude_code"], undefined, true);
+
+        expect(JSON.parse(withCopyMode.serialize()).isCopyMode).toBe(true);
+    });
+
+    it("keeps copy mode when a remote clone path is added", () => {
+        const file = AgentsFile.of(
+            ["claude_code"],
+            undefined,
+            true,
+        ).withRemoteClonePath("team", "/a");
+
+        expect(file.isCopyMode).toBe(true);
+    });
 });
 
 describe("AgentsFile#serialize", () => {
