@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
-import discoverMcpServersAction from "@artifacts/actions/discover-mcp-servers-action.js";
+import resolveMcpServersAction from "@artifacts/actions/resolve-mcp-servers-action.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 
 /*
@@ -26,10 +26,79 @@ export interface RemoteCapabilities {
 }
 
 /**
+ * The folder name a remote source might carry to group root level (unamspaced) capabilities.
+ */
+export const SHARED_NAMESPACE = ".shared";
+
+/**
  * Separator joining a nested item's namespace and name into one selection identifier.
  * A root-level item, whose namespace is empty, has nothing to join, so it keeps its bare name instead.
  */
 export const NAMESPACE_SEPARATOR = "::";
+
+/**
+ * Lists every root-level directory a namespace can come from.
+ */
+async function namespaceCandidateDirs(rootDir: string): Promise<string[]> {
+    const rootDirs = await filesystem.glob({
+        cwd: rootDir,
+        dot: true,
+        onlyDirectories: true,
+        pattern: "*",
+    });
+
+    return rootDirs.filter(
+        // Dot folder are excluded, only the shared namespace (if present) is included.
+        (dir) => dir === SHARED_NAMESPACE || !dir.startsWith("."),
+    );
+}
+
+/**
+ * Builds the glob patterns matching one capability's items at a remote's root,
+ * and directly inside each of its namespace candidate directories.
+ */
+function buildCapabilityPatterns(
+    capability: FolderCapability,
+    itemPattern: string,
+    namespaceDirs: string[],
+): string[] {
+    return [
+        `${capability}/${itemPattern}`,
+        ...namespaceDirs.map(
+            (dir) =>
+                `${filesystem.escapeGlobSegment(dir)}/${capability}/${itemPattern}`,
+        ),
+    ];
+}
+
+/**
+ * Globs every mcp config directly inside the given namespace candidate directories.
+ */
+function mcpConfigFilesIn(
+    rootDir: string,
+    namespaceDirs: string[],
+): Promise<string[]> {
+    return filesystem.glob({
+        cwd: rootDir,
+        dot: true,
+        pattern: buildCapabilityPatterns(
+            AgentCapability.Mcp,
+            "*/config.json",
+            namespaceDirs,
+        ),
+    });
+}
+
+/**
+ * Globs every mcp config at a remote source's root, respecting its namespace folders.
+ * Exposed so a sync stage can resolve the same set of files discovery already lists,
+ * without duplicating the namespace rule that excludes a dot folder other than the shared one.
+ */
+export async function remoteMcpConfigFiles(rootDir: string): Promise<string[]> {
+    const namespaceDirs = await namespaceCandidateDirs(rootDir);
+
+    return mcpConfigFilesIn(rootDir, namespaceDirs);
+}
 
 /**
  * Strips a selection identifier's namespace prefix, leaving its bare name.
@@ -52,31 +121,36 @@ export default async function discoverRemoteCapabilitiesAction(
 ): Promise<RemoteCapabilities> {
     const { rootDir } = options;
 
+    const namespaceDirs = await namespaceCandidateDirs(rootDir);
+
     const [skillPaths, commandPaths, mcpConfigPaths, hasGuidelines] =
         await Promise.all([
             filesystem.glob({
                 cwd: rootDir,
+                dot: true,
                 onlyDirectories: true,
-                pattern: `**/${AgentCapability.Skills}/*`,
+                pattern: buildCapabilityPatterns(
+                    AgentCapability.Skills,
+                    "*",
+                    namespaceDirs,
+                ),
             }),
             filesystem.glob({
                 cwd: rootDir,
+                dot: true,
                 onlyFiles: true,
-                pattern: `**/${AgentCapability.Commands}/**/*`,
+                pattern: buildCapabilityPatterns(
+                    AgentCapability.Commands,
+                    "**/*",
+                    namespaceDirs,
+                ),
             }),
-            filesystem.glob({
-                cwd: rootDir,
-                pattern: `**/${AgentCapability.Mcp}/*/config.json`,
-            }),
+            mcpConfigFilesIn(rootDir, namespaceDirs),
             filesystem.exists(`${rootDir}/GUIDELINES.md`),
         ]);
 
-    // Validates every discovered mcp config, throwing a clear error on a malformed one.
-    await discoverMcpServersAction({
-        cwd: rootDir,
-        recursive: true,
-        sourceDir: ".",
-    });
+    // Validates every mcp config already discovered above.
+    await resolveMcpServersAction({ cwd: rootDir, files: mcpConfigPaths });
 
     return {
         commands: commandPaths.map((path) =>
@@ -124,5 +198,10 @@ function namespacedIdentifier(
     // An mcp path's rest is still "<name>/config.json", its real name is that file's own directory.
     const name = capability === AgentCapability.Mcp ? dirname(rest) : rest;
 
-    return namespace ? `${namespace}${NAMESPACE_SEPARATOR}${name}` : name;
+    // The shared namespace folder resolves to the root namespace, same as a bare name.
+    const rootNamespace = namespace === SHARED_NAMESPACE ? "" : namespace;
+
+    return rootNamespace
+        ? `${rootNamespace}${NAMESPACE_SEPARATOR}${name}`
+        : name;
 }

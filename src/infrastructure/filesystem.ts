@@ -18,6 +18,7 @@ import fg from "fast-glob";
  */
 export default {
     copy: copy,
+    escapeGlobSegment: escapeGlobSegment,
     exists: exists,
     glob: glob,
     mkdir: mkdir,
@@ -33,9 +34,10 @@ export default {
  */
 
 interface GlobOptions {
-    pattern: string;
+    pattern: string | string[];
     cwd?: string;
     dot?: boolean;
+    ignore?: string[];
     onlyFiles?: boolean;
     onlyDirectories?: boolean;
 }
@@ -96,6 +98,13 @@ async function glob(options: GlobOptions): Promise<string[]> {
     const { pattern, ...globOptions } = options;
 
     return fg(pattern, globOptions);
+}
+
+/**
+ * Escapes a literal path segment, so it can be interpolated into a glob pattern safely.
+ */
+function escapeGlobSegment(segment: string): string {
+    return fg.escapePath(segment);
 }
 
 /**

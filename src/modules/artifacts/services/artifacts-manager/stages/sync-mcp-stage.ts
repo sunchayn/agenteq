@@ -8,8 +8,11 @@ import { expandPath } from "@support/utils/expand-path.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
-import discoverMcpServersAction from "@artifacts/actions/discover-mcp-servers-action.js";
-import { removeNamespace } from "@artifacts/actions/discover-remote-capabilities-action.js";
+import resolveMcpServersAction from "@artifacts/actions/resolve-mcp-servers-action.js";
+import {
+    remoteMcpConfigFiles,
+    removeNamespace,
+} from "@artifacts/actions/discover-remote-capabilities-action.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import reconcileMcpServersAction from "./mcp/actions/reconcile-mcp-servers-action.js";
@@ -71,9 +74,14 @@ interface CollectConfigWritesResult {
 async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
     const { cwd, sourceDir } = payload.context;
 
-    const localServers = await discoverMcpServersAction({
+    const localFiles = await filesystem.glob({
         cwd: cwd,
-        sourceDir: sourceDir,
+        pattern: `${sourceDir}/mcp/*/config.json`,
+    });
+
+    const localServers = await resolveMcpServersAction({
+        cwd: cwd,
+        files: localFiles,
     });
 
     const servers = [...localServers];
@@ -81,10 +89,11 @@ async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
     const claimedKeys = new Set(localServers.map((server) => server.key));
 
     for (const remote of payload.remoteSources) {
-        const remoteServers = await discoverMcpServersAction({
+        const remoteFiles = await remoteMcpConfigFiles(remote.rootDir);
+
+        const remoteServers = await resolveMcpServersAction({
             cwd: remote.rootDir,
-            recursive: true,
-            sourceDir: ".",
+            files: remoteFiles,
         });
 
         // A saved mcp selection entry can carry a namespace prefix, but a server's own key never does.

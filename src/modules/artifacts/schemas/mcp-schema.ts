@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Internal building blocks for mcpSchema,
 // defined first since a const initializer can't reference another const declared later in the same module.
-// A config's key is its own directory name, see discover-mcp-servers-action.ts.
+// A config's key is its own directory name, see resolve-mcp-servers-action.ts.
 const base = z.object({
     $schema: z.string().optional(),
 });

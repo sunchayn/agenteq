@@ -161,6 +161,82 @@ describe("discoverRemoteCapabilitiesAction", () => {
         ]);
     });
 
+    it("resolves a shared-namespace skill as a root item, with no namespace prefix", async () => {
+        await mkdir(join(rootDir, ".shared/skills/foo"), {
+            recursive: true,
+        });
+
+        await writeFile(join(rootDir, ".shared/skills/foo/SKILL.md"), "body");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.skills).toEqual(["foo"]);
+    });
+
+    it("keeps a shared-namespace skill distinct from a backend-namespaced one", async () => {
+        await mkdir(join(rootDir, ".shared/skills/foo"), {
+            recursive: true,
+        });
+
+        await writeFile(join(rootDir, ".shared/skills/foo/SKILL.md"), "body");
+
+        await mkdir(join(rootDir, "backend/skills/bar"), { recursive: true });
+        await writeFile(join(rootDir, "backend/skills/bar/SKILL.md"), "body");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.skills.sort()).toEqual(["backend::bar", "foo"]);
+    });
+
+    it("ignores a dot folder with no capability structure inside it", async () => {
+        await mkdir(join(rootDir, ".hidden/notes"), { recursive: true });
+        await writeFile(join(rootDir, ".hidden/notes/readme.txt"), "body");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result).toEqual({
+            commands: [],
+            hasGuidelines: false,
+            mcp: [],
+            skills: [],
+        });
+    });
+
+    it("ignores a .git folder's internal content", async () => {
+        await mkdir(join(rootDir, ".git/refs/heads"), { recursive: true });
+        await writeFile(join(rootDir, ".git/refs/heads/main"), "sha");
+        await mkdir(join(rootDir, ".git/hooks"), { recursive: true });
+        await writeFile(join(rootDir, ".git/hooks/pre-commit"), "#!/bin/sh");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result).toEqual({
+            commands: [],
+            hasGuidelines: false,
+            mcp: [],
+            skills: [],
+        });
+    });
+
+    it("ignores a dot folder other than the shared one, even with capability structure inside it", async () => {
+        await mkdir(join(rootDir, ".other/skills/baz"), { recursive: true });
+        await writeFile(join(rootDir, ".other/skills/baz/SKILL.md"), "body");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.skills).toEqual([]);
+    });
+
     it("keeps two same-name mcp servers in different namespaces distinguishable", async () => {
         await mkdir(join(rootDir, "backend/mcp/shared"), {
             recursive: true,

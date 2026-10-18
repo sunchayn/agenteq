@@ -14,20 +14,12 @@ import type { McpServer } from "@agents/entities/mcp-server.js";
 import type { z } from "zod";
 
 /**
- * Globs every {sourceDir}/mcp/<name>/config.json, validates each, and reshapes matches into McpServer.
- * Pass `recursive` to also match one nested under any folder, e.g. a remote source's `backend/mcp/<name>/config.json`.
+ * Resolves every given mcp config path into a validated McpServer.
  */
-export default async function discoverMcpServersAction(
-    options: DiscoverMcpServersOptions,
+export default async function resolveMcpServersAction(
+    options: ResolveMcpServersOptions,
 ): Promise<McpServer[]> {
-    const { cwd, recursive = false, sourceDir = ".ai" } = options;
-
-    const files = await filesystem.glob({
-        cwd: cwd,
-        pattern: recursive
-            ? "**/mcp/*/config.json"
-            : `${sourceDir}/mcp/*/config.json`,
-    });
+    const { cwd, files } = options;
 
     const servers: McpServer[] = [];
 
@@ -44,10 +36,9 @@ export default async function discoverMcpServersAction(
  * Interface & Types.
  */
 
-interface DiscoverMcpServersOptions {
+interface ResolveMcpServersOptions {
     cwd: string;
-    sourceDir?: string;
-    recursive?: boolean;
+    files: string[];
 }
 
 interface LoadMcpServerOptions {

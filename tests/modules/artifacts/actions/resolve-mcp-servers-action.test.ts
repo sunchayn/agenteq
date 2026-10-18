@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import discoverMcpServersAction from "@artifacts/actions/discover-mcp-servers-action.js";
+import resolveMcpServersAction from "@artifacts/actions/resolve-mcp-servers-action.js";
 
 let cwd: string;
 
@@ -21,14 +21,17 @@ async function writeConfig(name: string, contents: unknown): Promise<void> {
     await writeFile(join(dir, "config.json"), JSON.stringify(contents));
 }
 
-describe("discoverMcpServersAction", () => {
+describe("resolveMcpServersAction", () => {
     it("captures unknown fields into `extra` instead of rejecting them", async () => {
         await writeConfig("example", {
             config: { command: "npx", timeout: 30, trust: true },
             type: "stdio",
         });
 
-        const [server] = await discoverMcpServersAction({ cwd: cwd });
+        const [server] = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/example/config.json"],
+        });
 
         expect(server.extra).toEqual({ timeout: 30, trust: true });
     });
@@ -39,7 +42,10 @@ describe("discoverMcpServersAction", () => {
             type: "stdio",
         });
 
-        const [server] = await discoverMcpServersAction({ cwd: cwd });
+        const [server] = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/example/config.json"],
+        });
 
         expect(server.extra).toBeUndefined();
     });
@@ -47,9 +53,12 @@ describe("discoverMcpServersAction", () => {
     it("throws a clear error for an invalid config", async () => {
         await writeConfig("bad", { config: {}, type: "stdio" });
 
-        await expect(discoverMcpServersAction({ cwd: cwd })).rejects.toThrow(
-            /command/,
-        );
+        await expect(
+            resolveMcpServersAction({
+                cwd: cwd,
+                files: [".ai/mcp/bad/config.json"],
+            }),
+        ).rejects.toThrow(/command/);
     });
 
     it("uses the config's own directory name as its key", async () => {
@@ -58,42 +67,30 @@ describe("discoverMcpServersAction", () => {
             type: "stdio",
         });
 
-        const [server] = await discoverMcpServersAction({ cwd: cwd });
+        const [server] = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/renamed-server/config.json"],
+        });
 
         expect(server.key).toBe("renamed-server");
     });
 
-    it("ignores a config nested outside sourceDir when not recursive", async () => {
-        await mkdir(join(cwd, "backend/mcp/nested"), { recursive: true });
-        await writeFile(
-            join(cwd, "backend/mcp/nested/config.json"),
-            JSON.stringify({
-                config: { command: "npx" },
-                type: "stdio",
-            }),
-        );
-
-        const servers = await discoverMcpServersAction({ cwd: cwd });
-
-        expect(servers).toEqual([]);
-    });
-
-    it("finds a config nested under any folder when recursive", async () => {
-        await mkdir(join(cwd, "backend/mcp/nested"), { recursive: true });
-        await writeFile(
-            join(cwd, "backend/mcp/nested/config.json"),
-            JSON.stringify({
-                config: { command: "npx" },
-                type: "stdio",
-            }),
-        );
-
-        const servers = await discoverMcpServersAction({
-            cwd: cwd,
-            recursive: true,
-            sourceDir: ".",
+    it("resolves only the given files, ignoring any other config on disk", async () => {
+        await writeConfig("example", {
+            config: { command: "npx" },
+            type: "stdio",
         });
 
-        expect(servers.map((server) => server.key)).toEqual(["nested"]);
+        await writeConfig("other", {
+            config: { command: "npx" },
+            type: "stdio",
+        });
+
+        const servers = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/example/config.json"],
+        });
+
+        expect(servers.map((server) => server.key)).toEqual(["example"]);
     });
 });
