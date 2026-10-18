@@ -13,6 +13,7 @@ import {
 } from "@artifacts/services/artifacts-manager/stages/sync-symlink-capability-stage.js";
 import {
     extractReferenceAnnotations,
+    looksLikeFileReference,
     parseReferenceAnnotation,
     REMOTE_REFERENCES_DIR,
 } from "@artifacts/actions/resolve-reference-annotation-action.js";
@@ -62,6 +63,14 @@ export default async function syncReferencesStage(
     let result = payload;
 
     for (const occurrence of occurrences) {
+        const parsed = parseReferenceAnnotation(occurrence.annotation);
+
+        // A placeholder like "..." or "<file name>" is a syntax example,
+        // not a real reference, so it is skipped entirely, no row, no warning.
+        if (!looksLikeFileReference(parsed)) {
+            continue;
+        }
+
         const resolvedPath = await resolveReferenceAnnotationAction({
             annotation: occurrence.annotation,
             context: payload.context,
