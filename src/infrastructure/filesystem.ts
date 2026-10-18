@@ -1,7 +1,7 @@
 import {
     access,
     cp,
-    copyFile,
+    copyFile as copyFileAsync,
     mkdir as mkdirAsync,
     readdir,
     readFile as readFileAsync,
@@ -18,6 +18,7 @@ import fg from "fast-glob";
  */
 export default {
     copy: copy,
+    copyFile: copyFile,
     escapeGlobSegment: escapeGlobSegment,
     exists: exists,
     glob: glob,
@@ -48,6 +49,11 @@ interface WriteFileOptions {
 }
 
 interface SymlinkOrCopyOptions {
+    source: string;
+    target: string;
+}
+
+interface CopyFileOptions {
     source: string;
     target: string;
 }
@@ -116,7 +122,7 @@ async function symlinkOrCopy(options: SymlinkOrCopyOptions): Promise<void> {
     try {
         await symlink(relative(dirname(target), source), target);
     } catch {
-        await copyFile(source, target);
+        await copyFile({ source: source, target: target });
     }
 }
 
@@ -124,6 +130,15 @@ async function copy(options: CopyOptions): Promise<void> {
     const { source, target } = options;
 
     await cp(source, target, { recursive: true });
+}
+
+/**
+ * Copies a single file, explicitly, replacing whatever already occupies the target path.
+ */
+async function copyFile(options: CopyFileOptions): Promise<void> {
+    const { source, target } = options;
+
+    await copyFileAsync(source, target);
 }
 
 async function mkdir(path: string): Promise<void> {

@@ -18,6 +18,7 @@ export default async function syncArtifactsAction(
         agents,
         capabilities,
         context,
+        isCopyMode,
         isJson,
         label,
         shouldForce,
@@ -45,6 +46,7 @@ export default async function syncArtifactsAction(
     const outcome = await artifactsManager.sync({
         capabilities: capabilities,
         context: context,
+        isCopyMode: isCopyMode,
         selectedAgents: agents,
         shouldForce: shouldForce,
     });
@@ -74,6 +76,7 @@ interface RunSyncFlowOptions {
     agents: Agent[];
     capabilities: AgentCapability[];
     context: RunContext;
+    isCopyMode?: boolean;
     isJson: boolean;
     label: string;
     shouldForce?: boolean;

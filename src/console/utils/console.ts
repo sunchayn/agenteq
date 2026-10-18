@@ -8,7 +8,7 @@ export function renderAsJson(payload: unknown): string {
 }
 
 /**
- * Prints a message as plain text, or as a uniformly-shaped JSON payload when `isJson` is true.
+ * Prints a message as plain text, or as a uniformly-shaped JSON payload when JSON output is requested.
  */
 export function printMessage(options: PrintMessageOptions): void {
     const { isJson, level, message } = options;
@@ -55,4 +55,5 @@ export interface RawSyncOptions {
     updatePins?: boolean;
     dryRun?: boolean;
     force?: boolean;
+    copy?: boolean;
 }

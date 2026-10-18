@@ -11,6 +11,7 @@ const ENV_KEYS = [
     "AGENTEQ_SKIP_IN_CI",
     "AGENTEQ_UPDATE_PINS",
     "AGENTEQ_FORCE",
+    "AGENTEQ_COPY",
 ];
 
 afterEach(() => {
@@ -124,5 +125,25 @@ describe("resolveCommonSyncOptions", () => {
         const resolved = resolveCommonSyncOptions({});
 
         expect(resolved.shouldForce).toBe(true);
+    });
+
+    it("leaves copyFlag undefined with nothing set", () => {
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.copyFlag).toBeUndefined();
+    });
+
+    it("--copy takes precedence over AGENTEQ_COPY", () => {
+        process.env.AGENTEQ_COPY = "0";
+        const resolved = resolveCommonSyncOptions({ copy: true });
+
+        expect(resolved.copyFlag).toBe(true);
+    });
+
+    it("falls back to AGENTEQ_COPY when --copy is absent", () => {
+        process.env.AGENTEQ_COPY = "1";
+        const resolved = resolveCommonSyncOptions({});
+
+        expect(resolved.copyFlag).toBe(true);
     });
 });

@@ -24,6 +24,19 @@ describe("env.readFlag", () => {
     });
 });
 
+describe("env.readOptionalFlag", () => {
+    it("returns undefined when unset", () => {
+        expect(env.readOptionalFlag(KEY)).toBeUndefined();
+    });
+
+    it("parses the same as readFlag once set", () => {
+        process.env[KEY] = "true";
+        expect(env.readOptionalFlag(KEY)).toBe(true);
+        process.env[KEY] = "0";
+        expect(env.readOptionalFlag(KEY)).toBe(false);
+    });
+});
+
 describe("env.readString", () => {
     it("returns the value when set", () => {
         process.env[KEY] = "claude_code,cursor";

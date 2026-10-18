@@ -14,23 +14,28 @@ export default class AgentsFile {
 
     readonly capabilities: string[] | undefined;
 
+    readonly isCopyMode: boolean | undefined;
+
     readonly remoteClonePaths: Record<string, string>;
 
     private constructor(
         agentNames: string[],
         capabilities: string[] | undefined,
         remoteClonePaths: Record<string, string> = {},
+        isCopyMode?: boolean,
     ) {
         this.agentNames = agentNames;
         this.capabilities = capabilities;
         this.remoteClonePaths = remoteClonePaths;
+        this.isCopyMode = isCopyMode;
     }
 
     static of(
         agentNames: string[],
         capabilities: string[] | undefined,
+        isCopyMode?: boolean,
     ): AgentsFile {
-        return new AgentsFile(agentNames, capabilities);
+        return new AgentsFile(agentNames, capabilities, {}, isCopyMode);
     }
 
     static empty(): AgentsFile {
@@ -63,6 +68,7 @@ export default class AgentsFile {
             result.data.agents,
             result.data.capabilities,
             result.data.remoteClonePaths,
+            result.data.isCopyMode,
         );
     }
 
@@ -72,8 +78,14 @@ export default class AgentsFile {
     withAgents(
         agentNames: string[],
         capabilities: string[] | undefined,
+        isCopyMode?: boolean,
     ): AgentsFile {
-        return new AgentsFile(agentNames, capabilities, this.remoteClonePaths);
+        return new AgentsFile(
+            agentNames,
+            capabilities,
+            this.remoteClonePaths,
+            isCopyMode,
+        );
     }
 
     /**
@@ -91,10 +103,15 @@ export default class AgentsFile {
     }
 
     withRemoteClonePath(name: string, path: string): AgentsFile {
-        return new AgentsFile(this.agentNames, this.capabilities, {
-            ...this.remoteClonePaths,
-            [name]: path,
-        });
+        return new AgentsFile(
+            this.agentNames,
+            this.capabilities,
+            {
+                ...this.remoteClonePaths,
+                [name]: path,
+            },
+            this.isCopyMode,
+        );
     }
 
     withoutRemoteClonePath(remoteNameToDrop: string): AgentsFile {
@@ -106,6 +123,7 @@ export default class AgentsFile {
             this.agentNames,
             this.capabilities,
             remoteClonePaths,
+            this.isCopyMode,
         );
     }
 
@@ -113,6 +131,7 @@ export default class AgentsFile {
         const body: {
             agents: string[];
             capabilities?: string[];
+            isCopyMode?: boolean;
             remoteClonePaths?: Record<string, string>;
         } = {
             agents: this.agentNames,
@@ -120,6 +139,10 @@ export default class AgentsFile {
 
         if (this.capabilities) {
             body.capabilities = this.capabilities;
+        }
+
+        if (this.isCopyMode !== undefined) {
+            body.isCopyMode = this.isCopyMode;
         }
 
         if (Object.keys(this.remoteClonePaths).length > 0) {
@@ -137,5 +160,6 @@ export default class AgentsFile {
 const agentsFileSchema = z.object({
     agents: z.array(z.string()),
     capabilities: z.array(z.string()).optional(),
+    isCopyMode: z.boolean().optional(),
     remoteClonePaths: z.record(z.string(), z.string()).default({}),
 });

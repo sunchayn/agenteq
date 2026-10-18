@@ -112,6 +112,7 @@ The `sync` command also takes `--update-pins` (env: `AGENTEQ_UPDATE_PINS`), whic
 | `--source-dir <dir>`                      | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
 | `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
 | `--force`                                 | Overwrite an artifact even if it was hand-edited since the last sync. See [hand-edit protection](#hand-edit-protection) below.                                                                                                 |
+| `--copy`                                  | Materialize commands and skills as real file copies instead of symlinks. See [copy mode](#copy-mode) below.                                                                                                                    |
 
 Each flag above also has an environment variable equivalent, it might be useful for setting it once in CI:
 
@@ -122,6 +123,7 @@ Each flag above also has an environment variable equivalent, it might be useful 
 - AGENTEQ_SOURCE_DIR
 - AGENTEQ_SKIP_IN_CI
 - AGENTEQ_FORCE
+- AGENTEQ_COPY
 
 A CLI flag always overrides its matching environment variable.
 
@@ -135,6 +137,12 @@ The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer a
 After every sync, Agenteq saves the content hash of every artifact it wrote, at `<source-dir>/agenteq-sync-manifest.json`. The next time you run `init` or `sync`, it checks each previously written artifact's current content against that saved hash. If an artifact such as `CLAUDE.md` or `.cursor/mcp.json` was edited by hand since the last sync, Agenteq stops before overwriting anything and lists which file(s) were edited.
 
 Pass `--force` (env: `AGENTEQ_FORCE`) to overwrite anyway.
+
+### Copy mode
+
+By default, Agenteq mirrors commands and skills into each agent as symlinks back to the canonical source. A symlink into a remote source's clone does not resolve outside the machine that made it, for example in a sandbox, a container, or a cloud session.
+
+Pass `--copy` (env: `AGENTEQ_COPY`) to `init` or `sync` to materialize real file copies instead.
 
 ## Advanced Usage
 
