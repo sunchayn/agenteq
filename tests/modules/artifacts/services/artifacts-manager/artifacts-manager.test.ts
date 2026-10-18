@@ -25,6 +25,7 @@ import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
 import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-action.js";
+import discoverRemoteCapabilitiesAction from "@artifacts/actions/discover-remote-capabilities-action.js";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import { CliError } from "@support/errors/cli-error.js";
 
@@ -1554,6 +1555,66 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
         expect(
             await readFile(join(cwd, ".test/commands/shared.md"), "utf8"),
         ).toBe("shared");
+    });
+
+    it("resolves a shared-namespace item as root, end to end from discovery through sync", async () => {
+        await mkdir(join(remoteRoot, ".shared/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, ".shared/commands/foo.md"),
+            "foo body",
+        );
+
+        await mkdir(join(remoteRoot, "backend/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/commands/bar.md"),
+            "bar body",
+        );
+
+        const discovered = await discoverRemoteCapabilitiesAction({
+            rootDir: remoteRoot,
+        });
+
+        // A shared-namespace item discovers as a bare root identifier, same as a plain root one.
+        expect(discovered.commands.sort()).toEqual([
+            "backend::bar.md",
+            "foo.md",
+            "local.md",
+            "shared.md",
+        ]);
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: discovered.commands,
+                        guidelines: false,
+                        mcp: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        const target = join(cwd, ".test/commands");
+
+        expect(await readFile(join(target, "foo.md"), "utf8")).toBe("foo body");
+
+        expect(await readFile(join(target, "bar.md"), "utf8")).toBe("bar body");
     });
 });
 

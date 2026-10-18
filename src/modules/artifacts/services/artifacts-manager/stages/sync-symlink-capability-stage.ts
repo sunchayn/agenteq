@@ -7,7 +7,10 @@ import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
-import { NAMESPACE_SEPARATOR } from "@artifacts/actions/discover-remote-capabilities-action.js";
+import {
+    NAMESPACE_SEPARATOR,
+    SHARED_NAMESPACE,
+} from "@artifacts/actions/discover-remote-capabilities-action.js";
 import { AGENTEQ_SOURCES_ROOT } from "@support/utils/agenteq-sources-root.js";
 
 /**
@@ -311,10 +314,30 @@ function namespaceDirsFor(
 
     return [...selectionByNamespace.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([namespace, groupedSelection]) => ({
-            dir: join(remote.rootDir, namespace, capability),
-            selection: groupedSelection,
-        }));
+        .flatMap(([namespace, groupedSelection]) =>
+            namespace === ""
+                ? // The root namespace mirrors from both the remote's own root and its shared-namespace folder.
+                  [
+                      {
+                          dir: join(remote.rootDir, capability),
+                          selection: groupedSelection,
+                      },
+                      {
+                          dir: join(
+                              remote.rootDir,
+                              SHARED_NAMESPACE,
+                              capability,
+                          ),
+                          selection: groupedSelection,
+                      },
+                  ]
+                : [
+                      {
+                          dir: join(remote.rootDir, namespace, capability),
+                          selection: groupedSelection,
+                      },
+                  ],
+        );
 }
 
 /**
