@@ -12,7 +12,10 @@ import { AgentCapability } from "@artifacts/enums/agent-capability.js";
  * Guidelines is deliberately excluded, it stays a single root-level file, never folder-classified.
  */
 type FolderCapability =
-    AgentCapability.Skills | AgentCapability.Commands | AgentCapability.Mcp;
+    | AgentCapability.Skills
+    | AgentCapability.Commands
+    | AgentCapability.Mcp
+    | AgentCapability.References;
 
 interface DiscoverRemoteCapabilitiesOptions {
     rootDir: string;
@@ -22,6 +25,7 @@ export interface RemoteCapabilities {
     skills: string[];
     commands: string[];
     mcp: string[];
+    references: string[];
     hasGuidelines: boolean;
 }
 
@@ -123,31 +127,46 @@ export default async function discoverRemoteCapabilitiesAction(
 
     const namespaceDirs = await namespaceCandidateDirs(rootDir);
 
-    const [skillPaths, commandPaths, mcpConfigPaths, hasGuidelines] =
-        await Promise.all([
-            filesystem.glob({
-                cwd: rootDir,
-                dot: true,
-                onlyDirectories: true,
-                pattern: buildCapabilityPatterns(
-                    AgentCapability.Skills,
-                    "*",
-                    namespaceDirs,
-                ),
-            }),
-            filesystem.glob({
-                cwd: rootDir,
-                dot: true,
-                onlyFiles: true,
-                pattern: buildCapabilityPatterns(
-                    AgentCapability.Commands,
-                    "**/*",
-                    namespaceDirs,
-                ),
-            }),
-            mcpConfigFilesIn(rootDir, namespaceDirs),
-            filesystem.exists(`${rootDir}/GUIDELINES.md`),
-        ]);
+    const [
+        skillPaths,
+        commandPaths,
+        mcpConfigPaths,
+        referencePaths,
+        hasGuidelines,
+    ] = await Promise.all([
+        filesystem.glob({
+            cwd: rootDir,
+            dot: true,
+            onlyDirectories: true,
+            pattern: buildCapabilityPatterns(
+                AgentCapability.Skills,
+                "*",
+                namespaceDirs,
+            ),
+        }),
+        filesystem.glob({
+            cwd: rootDir,
+            dot: true,
+            onlyFiles: true,
+            pattern: buildCapabilityPatterns(
+                AgentCapability.Commands,
+                "**/*",
+                namespaceDirs,
+            ),
+        }),
+        mcpConfigFilesIn(rootDir, namespaceDirs),
+        filesystem.glob({
+            cwd: rootDir,
+            dot: true,
+            onlyFiles: true,
+            pattern: buildCapabilityPatterns(
+                AgentCapability.References,
+                "**/*",
+                namespaceDirs,
+            ),
+        }),
+        filesystem.exists(`${rootDir}/GUIDELINES.md`),
+    ]);
 
     // Validates every mcp config already discovered above.
     await resolveMcpServersAction({ cwd: rootDir, files: mcpConfigPaths });
@@ -159,6 +178,9 @@ export default async function discoverRemoteCapabilitiesAction(
         hasGuidelines: hasGuidelines,
         mcp: mcpConfigPaths.map((path) =>
             namespacedIdentifier(path, AgentCapability.Mcp),
+        ),
+        references: referencePaths.map((path) =>
+            namespacedIdentifier(path, AgentCapability.References),
         ),
         skills: skillPaths.map((path) =>
             namespacedIdentifier(path, AgentCapability.Skills),

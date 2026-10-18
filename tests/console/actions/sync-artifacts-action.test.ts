@@ -33,6 +33,7 @@ const selection = {
     commands: [],
     guidelines: true,
     mcp: [],
+    references: [],
     skills: [],
 };
 

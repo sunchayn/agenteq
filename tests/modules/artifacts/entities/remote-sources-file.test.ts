@@ -6,6 +6,7 @@ const selection = {
     commands: ["deploy.md"],
     guidelines: true,
     mcp: ["context7"],
+    references: [],
     skills: ["writing-tests"],
 };
 
@@ -151,6 +152,7 @@ describe("RemoteSourcesFile legacy clonePath", () => {
                             commands: [],
                             guidelines: false,
                             mcp: [],
+                            references: [],
                             skills: [],
                         },
                         url: "u",

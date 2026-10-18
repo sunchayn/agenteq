@@ -18,6 +18,7 @@ export class SyncPayload {
     readonly boostGuidelines?: string;
     readonly remoteSources: ResolvedRemoteSource[];
     readonly remoteSourceWarnings: string[];
+    readonly referenceAnnotationTable?: string;
 
     constructor(options: SyncPayloadOptions) {
         this.context = options.context;
@@ -29,6 +30,7 @@ export class SyncPayload {
         this.boostGuidelines = options.boostGuidelines;
         this.remoteSources = options.remoteSources ?? [];
         this.remoteSourceWarnings = options.remoteSourceWarnings ?? [];
+        this.referenceAnnotationTable = options.referenceAnnotationTable;
     }
 
     wantsCapability(capability: AgentCapability): boolean {
@@ -48,6 +50,7 @@ export class SyncPayload {
             capabilities: this.capabilities,
             context: this.context,
             isCopyMode: this.isCopyMode,
+            referenceAnnotationTable: this.referenceAnnotationTable,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: [...this.results, ...results],
@@ -65,6 +68,7 @@ export class SyncPayload {
             capabilities: this.capabilities,
             context: this.context,
             isCopyMode: this.isCopyMode,
+            referenceAnnotationTable: this.referenceAnnotationTable,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: this.results,
@@ -82,6 +86,7 @@ export class SyncPayload {
             capabilities: this.capabilities,
             context: this.context,
             isCopyMode: this.isCopyMode,
+            referenceAnnotationTable: this.referenceAnnotationTable,
             remoteSources: remoteSources,
             remoteSourceWarnings: this.remoteSourceWarnings,
             results: this.results,
@@ -90,7 +95,8 @@ export class SyncPayload {
     }
 
     /**
-     * Returns a new payload with one more warning about a remote source appended,
+     * Returns a new payload with one more warning appended.
+     * The warning may describe a remote source problem or an unresolved reference annotation,
      * surfaced to the user through the sync outcome instead of a thrown error.
      */
     withRemoteSourceWarning(warning: string): SyncPayload {
@@ -100,8 +106,29 @@ export class SyncPayload {
             capabilities: this.capabilities,
             context: this.context,
             isCopyMode: this.isCopyMode,
+            referenceAnnotationTable: this.referenceAnnotationTable,
             remoteSources: this.remoteSources,
             remoteSourceWarnings: [...this.remoteSourceWarnings, warning],
+            results: this.results,
+            selectedAgents: this.selectedAgents,
+        });
+    }
+
+    /**
+     * Returns a new payload carrying the generated mapping table.
+     * The table lists every reference annotation alongside its real target path.
+     */
+    withReferenceAnnotationTable(
+        referenceAnnotationTable: string,
+    ): SyncPayload {
+        return new SyncPayload({
+            artifactPaths: this.artifactPaths,
+            boostGuidelines: this.boostGuidelines,
+            capabilities: this.capabilities,
+            context: this.context,
+            referenceAnnotationTable: referenceAnnotationTable,
+            remoteSources: this.remoteSources,
+            remoteSourceWarnings: this.remoteSourceWarnings,
             results: this.results,
             selectedAgents: this.selectedAgents,
         });
@@ -127,6 +154,7 @@ interface SyncPayloadOptions {
     results?: SyncResult[];
     artifactPaths?: string[];
     boostGuidelines?: string;
+    referenceAnnotationTable?: string;
     remoteSources?: ResolvedRemoteSource[];
     remoteSourceWarnings?: string[];
 }

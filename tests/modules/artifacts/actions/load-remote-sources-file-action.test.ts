@@ -52,6 +52,7 @@ describe("loadRemoteSourcesFileAction", () => {
                             commands: [],
                             guidelines: false,
                             mcp: [],
+                            references: [],
                             skills: [],
                         },
                         url: "git@example.com",

@@ -68,6 +68,10 @@ export function registerRemoteSourceCommand(program: Command): void {
             "comma-separated mcp server names to select, skips the picker",
         )
         .option(
+            "--references <names>",
+            "comma-separated reference names to select, skips the picker",
+        )
+        .option(
             "--guidelines",
             "select this source's GUIDELINES.md, skips the picker",
         )
@@ -110,6 +114,10 @@ export function registerRemoteSourceCommand(program: Command): void {
         .option(
             "--mcp <names>",
             "comma-separated mcp server names to select, skips the picker",
+        )
+        .option(
+            "--references <names>",
+            "comma-separated reference names to select, skips the picker",
         )
         .option(
             "--guidelines",
@@ -197,6 +205,7 @@ interface ScriptableSelectionOptions {
     skills?: string;
     commands?: string;
     mcp?: string;
+    references?: string;
     guidelines?: boolean;
 }
 
@@ -711,23 +720,30 @@ function assertUsableCapabilities(
     capabilities: RemoteCapabilities,
     name: string,
 ): void {
-    const { commands, hasGuidelines, mcp, skills } = capabilities;
+    const { commands, hasGuidelines, mcp, references, skills } = capabilities;
 
     if (
         skills.length === 0 &&
         commands.length === 0 &&
         mcp.length === 0 &&
+        references.length === 0 &&
         !hasGuidelines
     ) {
         throw new CliError(
             "E_INVALID_REMOTE_SOURCE",
-            `"${pc.bold(name)}" has none of mcp/, commands/, skills/, or GUIDELINES.md at its root.`,
+            `"${pc.bold(name)}" has none of mcp/, commands/, skills/, references/, or GUIDELINES.md at its root.`,
         );
     }
 }
 
 function emptySelection(): RemoteSourceSelection {
-    return { commands: [], guidelines: false, mcp: [], skills: [] };
+    return {
+        commands: [],
+        guidelines: false,
+        mcp: [],
+        references: [],
+        skills: [],
+    };
 }
 
 function selectEverything(
@@ -737,13 +753,14 @@ function selectEverything(
         commands: capabilities.commands,
         guidelines: capabilities.hasGuidelines,
         mcp: capabilities.mcp,
+        references: capabilities.references,
         skills: capabilities.skills,
     };
 }
 
 /**
  * Reports whether `add` or `update-choices` was given any scriptable selection flag,
- * `--skills`, `--commands`, `--mcp`, or `--guidelines`.
+ * `--skills`, `--commands`, `--mcp`, `--references`, or `--guidelines`.
  * Their presence, not `--yes`, is what skips the interactive picker.
  */
 function hasExplicitSelection(options: ScriptableSelectionOptions): boolean {
@@ -751,6 +768,7 @@ function hasExplicitSelection(options: ScriptableSelectionOptions): boolean {
         options.skills !== undefined ||
         options.commands !== undefined ||
         options.mcp !== undefined ||
+        options.references !== undefined ||
         options.guidelines === true
     );
 }
@@ -769,15 +787,18 @@ function resolveExplicitSelection(
     const skills = parseItemList(options.skills);
     const commands = parseItemList(options.commands);
     const mcp = parseItemList(options.mcp);
+    const references = parseItemList(options.references);
 
     assertItemsExist(skills, capabilities.skills, "skill", name);
     assertItemsExist(commands, capabilities.commands, "command", name);
     assertItemsExist(mcp, capabilities.mcp, "mcp server", name);
+    assertItemsExist(references, capabilities.references, "reference", name);
 
     return {
         commands: commands,
         guidelines: options.guidelines ?? false,
         mcp: mcp,
+        references: references,
         skills: skills,
     };
 }
@@ -847,6 +868,15 @@ async function promptForSelection(
               )
             : [];
 
+    const references =
+        capabilities.references.length > 0
+            ? await promptGroupMultiselect(
+                  `Select ${pc.bold("References")} to sync from this source`,
+                  namespacedOptions(capabilities.references),
+                  current.references,
+              )
+            : [];
+
     const guidelines = capabilities.hasGuidelines
         ? await promptConfirm(
               `Sync this source's ${pc.bold("GUIDELINES.md")}?`,
@@ -858,6 +888,7 @@ async function promptForSelection(
         commands: commands,
         guidelines: guidelines,
         mcp: mcp,
+        references: references,
         skills: skills,
     };
 }
