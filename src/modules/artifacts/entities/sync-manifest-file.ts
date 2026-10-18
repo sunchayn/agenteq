@@ -39,7 +39,10 @@ export default class SyncManifestFile {
         const result = syncManifestFileSchema.safeParse(parsed);
 
         return result.success
-            ? new SyncManifestFile(result.data.artifacts, result.data.pathsByCapability)
+            ? new SyncManifestFile(
+                  result.data.artifacts,
+                  result.data.pathsByCapability,
+              )
             : new SyncManifestFile();
     }
 

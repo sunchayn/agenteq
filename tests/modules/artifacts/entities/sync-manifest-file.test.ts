@@ -126,9 +126,9 @@ describe("SyncManifestFile#serialize", () => {
     });
 
     it("ends with a trailing newline", () => {
-        expect(new SyncManifestFile({ "CLAUDE.md": "abc" }).serialize()).toMatch(
-            /\n$/,
-        );
+        expect(
+            new SyncManifestFile({ "CLAUDE.md": "abc" }).serialize(),
+        ).toMatch(/\n$/);
     });
 
     it("saving hashes after loading capability paths preserves those paths on disk", () => {
@@ -152,7 +152,9 @@ describe("SyncManifestFile#serialize", () => {
         );
 
         const saved = SyncManifestFile.parse(
-            loaded.withCapability("skills", [".test/skills/a/SKILL.md"]).serialize(),
+            loaded
+                .withCapability("skills", [".test/skills/a/SKILL.md"])
+                .serialize(),
         );
 
         expect(saved.hashFor("CLAUDE.md")).toBe("abc");

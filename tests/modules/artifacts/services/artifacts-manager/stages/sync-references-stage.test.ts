@@ -141,12 +141,7 @@ describe("syncReferencesStage", () => {
         expect(result.remoteSourceWarnings).toEqual([]);
 
         const mirrored = await readFile(
-            join(
-                cwd,
-                ".ai",
-                REMOTE_REFERENCES_DIR,
-                "team/glossary/billing.md",
-            ),
+            join(cwd, ".ai", REMOTE_REFERENCES_DIR, "team/glossary/billing.md"),
             "utf8",
         );
 
