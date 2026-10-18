@@ -663,13 +663,12 @@ function assertRemoteConfigured(
  * A capability `add-capability` can address by a single item name.
  * Guidelines is excluded. It syncs as one whole-source toggle, not a list of addressable items.
  */
-const PATHABLE_CAPABILITIES: Partial<
-    Record<string, PathableCapabilityField>
-> = {
-    [AgentCapability.Commands]: { itemLabel: "command", key: "commands" },
-    [AgentCapability.Mcp]: { itemLabel: "mcp server", key: "mcp" },
-    [AgentCapability.Skills]: { itemLabel: "skill", key: "skills" },
-};
+const PATHABLE_CAPABILITIES: Partial<Record<string, PathableCapabilityField>> =
+    {
+        [AgentCapability.Commands]: { itemLabel: "command", key: "commands" },
+        [AgentCapability.Mcp]: { itemLabel: "mcp server", key: "mcp" },
+        [AgentCapability.Skills]: { itemLabel: "skill", key: "skills" },
+    };
 
 /**
  * Validates `add-capability`'s `<capability>` argument against the capabilities it can address by item.
