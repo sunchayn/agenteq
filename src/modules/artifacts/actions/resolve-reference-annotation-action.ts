@@ -52,6 +52,21 @@ export function parseReferenceAnnotation(
 }
 
 /**
+ * Pattern matching a filename extension, such as ".md".
+ */
+const FILE_EXTENSION_PATTERN = /\.\w+$/;
+
+/**
+ * Whether a parsed annotation's path looks like a real file,
+ * not a placeholder like "..." or "<file name>".
+ */
+export function looksLikeFileReference(
+    parsed: ParsedReferenceAnnotation,
+): boolean {
+    return FILE_EXTENSION_PATTERN.test(parsed.path);
+}
+
+/**
  * Resolves one "@reference(...)" annotation to the real relative path Agenteq synced it under.
  * Returns undefined when nothing on disk matches.
  */

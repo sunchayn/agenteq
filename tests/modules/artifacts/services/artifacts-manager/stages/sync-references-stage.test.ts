@@ -90,7 +90,7 @@ describe("syncReferencesStage", () => {
         );
     });
 
-    it("warns when an annotation cannot be resolved, without throwing", async () => {
+    it("warns when a file-looking annotation cannot be resolved, without throwing", async () => {
         await mkdir(join(cwd, ".ai/references"), { recursive: true });
         await mkdir(join(cwd, ".ai/skills/billing"), { recursive: true });
         await writeFile(
@@ -103,6 +103,20 @@ describe("syncReferencesStage", () => {
         expect(result.remoteSourceWarnings).toHaveLength(1);
         expect(result.remoteSourceWarnings[0]).toContain("glossary/missing.md");
         expect(result.referenceAnnotationTable).toContain("unresolved");
+    });
+
+    it("drops a placeholder annotation from the table, without a warning", async () => {
+        await mkdir(join(cwd, ".ai/references"), { recursive: true });
+        await mkdir(join(cwd, ".ai/skills/billing"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/skills/billing/SKILL.md"),
+            "Syntax: @reference(<file name>) or @reference(...).",
+        );
+
+        const result = await syncReferencesStage(payloadFor());
+
+        expect(result.remoteSourceWarnings).toHaveLength(0);
+        expect(result.referenceAnnotationTable).toBe("");
     });
 
     it("mirrors a remote-qualified annotation's target even when not explicitly selected", async () => {
