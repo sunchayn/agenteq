@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import loadSyncManifestFileAction from "@artifacts/actions/load-sync-manifest-file-action.js";
 import saveSyncManifestFileAction from "@artifacts/actions/save-sync-manifest-file-action.js";
+import saveCopiedFilesFileAction from "@artifacts/actions/save-copied-files-file-action.js";
+import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
 let cwd: string;
@@ -40,5 +42,22 @@ describe("loadSyncManifestFileAction", () => {
         });
 
         expect(manifest.hashFor("CLAUDE.md")).toBeDefined();
+    });
+
+    it("reads back a previously saved capability's copied paths", async () => {
+        await saveCopiedFilesFileAction({
+            capability: AgentCapability.Skills,
+            context: context,
+            copiedFilePaths: [".test/skills/a/SKILL.md"],
+            mirroredFilePaths: [".test/skills/a/SKILL.md"],
+        });
+
+        const manifest = await loadSyncManifestFileAction({
+            context: context,
+        });
+
+        expect(manifest.pathsFor(AgentCapability.Skills)).toEqual([
+            ".test/skills/a/SKILL.md",
+        ]);
     });
 });

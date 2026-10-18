@@ -8,9 +8,9 @@ description: Refactors every source repository to agenteq first, using refactor-
 ## 1. End state
 
 - Every source repository refactored to agenteq's canonical structure, if it was not already. Its scattered per-agent files are gone. Its canonical source directory holds its guidelines, skills, commands, references, MCP servers.
-- A destination repository with `mcp/<name>/config.json`, `commands/**`, `skills/**`, `references/**`, `GUIDELINES.md` at its root (agenteq's remote source layout). It holds shared content from every source repository, generalized so no single repository owns it. The destination is a pure content source. It never runs `agenteq`. No `.ai/`, no `agenteq.json`, no generated per-agent files.
+- A destination repository with `mcp/<name>/config.json`, `commands/**`, `skills/**`, `references/**`, `GUIDELINES.md` at its root (agenteq's remote source layout). It holds shared content from every source repository, generalized so no single repository owns it. The destination is a pure content source. It never runs `agenteq`. No `.ai/`, no `agenteq/config.json`, no generated per-agent files.
 - Each source repository keeps only its own content. Shareable content moves to the destination. Nothing shareable is duplicated.
-- Each source repository has a named remote source pointing at the destination, in its canonical source directory's `remote-sources.json`. The real `agenteq` CLI does the sync.
+- Each source repository has a named remote source pointing at the destination, in its canonical source directory's `agenteq/remote-sources.json`. The real `agenteq` CLI does the sync.
 - A consolidation report listing everything that could not be safely generalized, and how the user resolved each.
 
 Every path here is a placeholder. Replace it with what the user gives you.
@@ -113,7 +113,7 @@ While generalizing, compare each artifact's name (skill directory name, command 
 
 ## 8. Write resolved artifacts into the destination
 
-Write every artifact that survived step 7 (generalized, no naming conflict) at the destination's root: `mcp/<key>/config.json`, `commands/*.md`, `skills/<name>/`, `references/<path>`. Merge guideline text into `GUIDELINES.md`. Do not nest anything under `.ai/`. Do not run `agenteq init` or `agenteq sync` in the destination. It is a remote source for other repositories, not a project syncing its own agents. No `agenteq.json`, no per-agent files, no gitignore entries for them.
+Write every artifact that survived step 7 (generalized, no naming conflict) at the destination's root: `mcp/<key>/config.json`, `commands/*.md`, `skills/<name>/`, `references/<path>`. Merge guideline text into `GUIDELINES.md`. Do not nest anything under `.ai/`. Do not run `agenteq init` or `agenteq sync` in the destination. It is a remote source for other repositories, not a project syncing its own agents. No `agenteq/config.json`, no per-agent files, no gitignore entries for them.
 
 Writing at the destination's root, with no namespace folder, resolves as root capabilities, the same meaning `.shared` carries once namespace folders exist. Destination already namespaced, or this run adds one. Write under `.shared/` instead of the bare root, so root capabilities group with the namespaces instead of sitting awkwardly next to them. No namespace folders yet. Keep writing at the root.
 
@@ -143,7 +143,7 @@ For each source repository:
 
 1. Remove from this repository's canonical source directory anything that migrated to the destination in step 8. Keep only what step 10 decided stays local. The directory now holds only this repository's own content.
 2. Run `npx agenteq remote-source add <name> <destination-git-url> --yes --source-dir <this repository's canonical source directory> --path <destination-local-path>` inside this repository. Use the exact local path the destination was built at in step 3. `--path` reuses the already-pushed working copy instead of cloning the same content per repository. The run is non-interactive, so it selects every capability from the destination by default.
-3. Open this repository's `remote-sources.json`. Edit the new entry's `selection` field by hand: the exact subset of skills, commands, references, MCP servers, plus the guidelines boolean, this repository should pull. The previous command could not prompt for this. This file edit is how a repository ends up with less than everything the destination offers. Default to everything. Ask the user only if the subset is genuinely ambiguous.
+3. Open this repository's `agenteq/remote-sources.json`. Edit the new entry's `selection` field by hand: the exact subset of skills, commands, references, MCP servers, plus the guidelines boolean, this repository should pull. The previous command could not prompt for this. This file edit is how a repository ends up with less than everything the destination offers. Default to everything. Ask the user only if the subset is genuinely ambiguous.
 4. Run `npx agenteq sync --yes` inside this repository, then confirm the result with `git status`. Step 5 already ran `agenteq init` here, so `sync` reuses its saved agent list. `agenteq sync` warns, with a `git rm -r --cached <paths>` fix, about any newly ignored path that git already tracked (e.g. a file removed in item 1 that a remote artifact now replaces). Run that fix whenever it appears. Show it to the user first. Never leave that warning unresolved.
 
 ## 13. Set up hooks to keep sync current
@@ -183,4 +183,4 @@ Not a new artifact file.
 ## 16. Reference: check before starting
 
 - Confirm `npx skills` and `npx agenteq` run in each source repository. Neither needs pre-installation, `npx` fetches on demand. The destination never runs either (step 8).
-- A source repository may already be a remote source for another project. That is not a conflict. Step 5's delegated skill and this skill's steps only touch this repository's canonical source directory. Neither touches `remote-sources.json` entries unrelated to the destination built here.
+- A source repository may already be a remote source for another project. That is not a conflict. Step 5's delegated skill and this skill's steps only touch this repository's canonical source directory. Neither touches `agenteq/remote-sources.json` entries unrelated to the destination built here.

@@ -4,10 +4,10 @@ import type { RunContext } from "@shared/types/run-context.js";
 
 /**
  * Agenteq's own saved record of every named remote git source, keyed by the name given to it.
- * Each entry holds the url and the capabilities picked from it, saved at <source-dir>/remote-sources.json.
+ * Each entry holds the url and the capabilities picked from it, saved at <source-dir>/agenteq/remote-sources.json.
  */
 export default class RemoteSourcesFile {
-    private static readonly FILENAME = "remote-sources.json";
+    private static readonly FILENAME = "agenteq/remote-sources.json";
 
     readonly remotes: Record<string, RemoteSourceEntry>;
 

@@ -5,7 +5,7 @@ import AgentsFile from "@agents/entities/agents-file.js";
 describe("AgentsFile.path", () => {
     it("joins the canonical source directory and the agents filename", () => {
         expect(AgentsFile.path({ cwd: "/repo", sourceDir: ".ai" })).toBe(
-            join("/repo", ".ai", "agenteq.json"),
+            join("/repo", ".ai", "agenteq", "config.json"),
         );
     });
 });

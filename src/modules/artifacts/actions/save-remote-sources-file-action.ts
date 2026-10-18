@@ -1,9 +1,7 @@
-import { dirname, relative } from "node:path";
-import filesystem from "@infrastructure/filesystem.js";
-import git from "@infrastructure/git.js";
 import RemoteSourcesFile, {
     type RemoteSourceEntry,
 } from "@artifacts/entities/remote-sources-file.js";
+import writeTrackedStateFileAction from "@shared/actions/write-tracked-state-file-action.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
 /**
@@ -15,22 +13,12 @@ export default async function saveRemoteSourcesFileAction(
 ): Promise<void> {
     const { context, remotes, shouldIgnore } = options;
 
-    const path = RemoteSourcesFile.path(context);
-    const existedBefore = await filesystem.exists(path);
-
-    await filesystem.mkdir(dirname(path));
-
-    await filesystem.writeFile({
+    await writeTrackedStateFileAction({
         content: new RemoteSourcesFile(remotes).serialize(),
-        path: path,
+        context: context,
+        path: RemoteSourcesFile.path(context),
+        shouldIgnore: shouldIgnore,
     });
-
-    if (!existedBefore && shouldIgnore) {
-        await git.ignore({
-            cwd: context.cwd,
-            relPath: relative(context.cwd, path),
-        });
-    }
 }
 
 /*

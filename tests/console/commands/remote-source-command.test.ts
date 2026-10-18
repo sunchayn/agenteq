@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import git from "@infrastructure/git.js";
@@ -407,7 +407,9 @@ describe("agenteq remote-source add", () => {
 
         const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(gitignore).toContain(".ai/remote-sources.json");
+        expect(gitignore).toContain(
+            relative(cwd, RemoteSourcesFile.path(context)),
+        );
     });
 
     it("throws a trackable CliError when the clone has none of the expected layout", async () => {

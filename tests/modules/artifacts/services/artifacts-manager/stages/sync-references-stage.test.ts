@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import syncReferencesStage from "@artifacts/services/artifacts-manager/stages/sync-references-stage.js";
+import { REMOTE_REFERENCES_DIR } from "@artifacts/actions/resolve-reference-annotation-action.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
@@ -140,7 +141,7 @@ describe("syncReferencesStage", () => {
         expect(result.remoteSourceWarnings).toEqual([]);
 
         const mirrored = await readFile(
-            join(cwd, ".ai/references/remote/team/glossary/billing.md"),
+            join(cwd, ".ai", REMOTE_REFERENCES_DIR, "team/glossary/billing.md"),
             "utf8",
         );
 
@@ -185,7 +186,9 @@ describe("syncReferencesStage", () => {
 
         const target = join(
             cwd,
-            ".ai/references/remote/team/glossary/billing.md",
+            ".ai",
+            REMOTE_REFERENCES_DIR,
+            "team/glossary/billing.md",
         );
 
         expect((await lstat(target)).isSymbolicLink()).toBe(false);

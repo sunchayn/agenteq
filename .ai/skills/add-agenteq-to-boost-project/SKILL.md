@@ -11,7 +11,7 @@ description: Wires agenteq onto a Laravel project that already runs Laravel Boos
 - `.ai/mcp/<name>/config.json` for every MCP server configured for any agent. Includes `.ai/mcp/laravel-boost/config.json` when Boost's MCP server is in use.
 - `.ai/commands/**` for every command file configured for any agent. Boost has no commands feature, so all found commands are hand-authored.
 - `.ai/skills/`, `.ai/guidelines/`, `.ai/rules` untouched. They are Boost's directories, not agenteq's. agenteq detects `boost.json`'s `skills` field and drops the `skills` capability for this project. Boost alone manages skills.
-- `agenteq.json` with chosen agents and capabilities `mcp`, `commands`, `guidelines`, `references`. No `skills`.
+- `agenteq/config.json` with chosen agents and capabilities `mcp`, `commands`, `guidelines`, `references`. No `skills`.
 - Every generated per-agent file gitignored, including Boost's per-agent files not already ignored.
 - Boost's composer `post-install-cmd`/`post-update-cmd` extended to run `npx agenteq sync --yes --skip-in-ci` right after Boost's command, when that wiring exists.
 - Any existing git hook that calls Boost extended the same way.
@@ -124,7 +124,7 @@ Do not reimplement agenteq's gitignore or file-writing logic. Run the tool:
 npx agenteq init --agents <comma-separated agent names from step 4> --yes
 ```
 
-agenteq detects `boost.json`'s `skills` field and drops `skills` from the default capabilities when Boost manages skills here. No `--only` flag needed. The default is saved in `agenteq.json`, so every later bare `agenteq sync`, including those in the step 10 and 11 hooks, also excludes `skills`.
+agenteq detects `boost.json`'s `skills` field and drops `skills` from the default capabilities when Boost manages skills here. No `--only` flag needed. The default is saved in `agenteq/config.json`, so every later bare `agenteq sync`, including those in the step 10 and 11 hooks, also excludes `skills`.
 
 ## 9. Untrack generated files from git
 

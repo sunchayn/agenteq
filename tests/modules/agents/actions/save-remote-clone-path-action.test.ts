@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import saveAgentsFileAction from "@agents/actions/save-agents-file-action.js";
 import saveRemoteClonePathAction from "@agents/actions/save-remote-clone-path-action.js";
@@ -35,7 +35,7 @@ describe("saveRemoteClonePathAction", () => {
         expect((await readSaved())?.clonePathOf("team")).toBe("/a");
 
         expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(
-            ".ai/agenteq.json",
+            relative(cwd, AgentsFile.path(context)),
         );
     });
 

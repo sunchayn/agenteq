@@ -151,7 +151,7 @@ describe("agenteq init: interactive re-prompt", () => {
     });
 
     it("tolerates a malformed existing agents file as an advisory preselect", async () => {
-        await mkdir(join(cwd, ".ai"), { recursive: true });
+        await mkdir(join(cwd, ".ai/agenteq"), { recursive: true });
         await writeFile(AgentsFile.path(context), "not json", "utf8");
         detectAgentsMock.mockResolvedValue(detected([claudeCode, false]));
         multiselectMock.mockResolvedValue(["claude_code"]);

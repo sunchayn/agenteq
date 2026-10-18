@@ -18,7 +18,7 @@ const teamEntry = {
 describe("RemoteSourcesFile.path", () => {
     it("joins the canonical source directory and the remote sources filename", () => {
         expect(RemoteSourcesFile.path({ cwd: "/repo", sourceDir: ".ai" })).toBe(
-            join("/repo", ".ai", "remote-sources.json"),
+            join("/repo", ".ai", "agenteq", "remote-sources.json"),
         );
     });
 });

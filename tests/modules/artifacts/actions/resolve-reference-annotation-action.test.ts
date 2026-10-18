@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import resolveReferenceAnnotationAction, {
     extractReferenceAnnotations,
     parseReferenceAnnotation,
+    REMOTE_REFERENCES_DIR,
 } from "@artifacts/actions/resolve-reference-annotation-action.js";
 
 describe("extractReferenceAnnotations", () => {
@@ -84,14 +85,17 @@ describe("resolveReferenceAnnotationAction", () => {
     });
 
     it("resolves a remote-qualified path against that remote's mirrored copy only", async () => {
-        await mkdir(join(cwd, ".ai/references/remote/team/glossary"), {
+        const remoteBillingPath = join(
+            ".ai",
+            REMOTE_REFERENCES_DIR,
+            "team/glossary/billing.md",
+        );
+
+        await mkdir(join(cwd, ".ai", REMOTE_REFERENCES_DIR, "team/glossary"), {
             recursive: true,
         });
 
-        await writeFile(
-            join(cwd, ".ai/references/remote/team/glossary/billing.md"),
-            "hi",
-        );
+        await writeFile(join(cwd, remoteBillingPath), "hi");
 
         const resolved = await resolveReferenceAnnotationAction({
             annotation: "team:glossary::billing.md",
@@ -99,18 +103,21 @@ describe("resolveReferenceAnnotationAction", () => {
             remoteNames: ["team"],
         });
 
-        expect(resolved).toBe(".ai/references/remote/team/glossary/billing.md");
+        expect(resolved).toBe(remoteBillingPath);
     });
 
     it("prefers the hint remote's own mirrored copy over the local source", async () => {
-        await mkdir(join(cwd, ".ai/references/remote/team/glossary"), {
+        const remoteBillingPath = join(
+            ".ai",
+            REMOTE_REFERENCES_DIR,
+            "team/glossary/billing.md",
+        );
+
+        await mkdir(join(cwd, ".ai", REMOTE_REFERENCES_DIR, "team/glossary"), {
             recursive: true,
         });
 
-        await writeFile(
-            join(cwd, ".ai/references/remote/team/glossary/billing.md"),
-            "remote",
-        );
+        await writeFile(join(cwd, remoteBillingPath), "remote");
 
         await mkdir(join(cwd, ".ai/references/glossary"), { recursive: true });
         await writeFile(
@@ -125,7 +132,7 @@ describe("resolveReferenceAnnotationAction", () => {
             remoteNames: ["team"],
         });
 
-        expect(resolved).toBe(".ai/references/remote/team/glossary/billing.md");
+        expect(resolved).toBe(remoteBillingPath);
     });
 
     it("returns undefined when nothing on disk matches", async () => {

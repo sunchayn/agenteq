@@ -1,11 +1,11 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import saveCopiedFilesFileAction from "@artifacts/actions/save-copied-files-file-action.js";
-import loadCopiedFilesFileAction from "@artifacts/actions/load-copied-files-file-action.js";
+import loadSyncManifestFileAction from "@artifacts/actions/load-sync-manifest-file-action.js";
 import filesystem from "@infrastructure/filesystem.js";
-import CopiedFilesFile from "@artifacts/entities/copied-files-file.js";
+import SyncManifestFile from "@artifacts/entities/sync-manifest-file.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
@@ -30,7 +30,7 @@ describe("saveCopiedFilesFileAction", () => {
             mirroredFilePaths: [".test/skills/a/SKILL.md"],
         });
 
-        const file = await loadCopiedFilesFileAction({ context: context });
+        const file = await loadSyncManifestFileAction({ context: context });
 
         expect(file.pathsFor(AgentCapability.Skills)).toEqual([
             ".test/skills/a/SKILL.md",
@@ -122,14 +122,14 @@ describe("saveCopiedFilesFileAction", () => {
             await filesystem.exists(join(cwd, ".test/skills/a/SKILL.md")),
         ).toBe(true);
 
-        const file = await loadCopiedFilesFileAction({ context: context });
+        const file = await loadSyncManifestFileAction({ context: context });
 
         expect(file.pathsFor(AgentCapability.Skills)).toEqual([
             ".test/skills/a/SKILL.md",
         ]);
     });
 
-    it("gitignores the copied files record the first time it is created", async () => {
+    it("gitignores the sync manifest the first time it is created", async () => {
         await saveCopiedFilesFileAction({
             capability: AgentCapability.Skills,
             context: context,
@@ -138,7 +138,7 @@ describe("saveCopiedFilesFileAction", () => {
         });
 
         expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(
-            "agenteq-copied-files.json",
+            relative(cwd, SyncManifestFile.path(context)),
         );
     });
 
@@ -150,14 +150,14 @@ describe("saveCopiedFilesFileAction", () => {
             mirroredFilePaths: [],
         });
 
-        expect(await filesystem.exists(CopiedFilesFile.path(context))).toBe(
+        expect(await filesystem.exists(SyncManifestFile.path(context))).toBe(
             false,
         );
     });
 });
 
-describe("CopiedFilesFile.path matches where saveCopiedFilesFileAction writes", () => {
-    it("writes under <source-dir>/agenteq-copied-files.json", async () => {
+describe("SyncManifestFile.path matches where saveCopiedFilesFileAction writes", () => {
+    it("writes under <source-dir>/agenteq/sync-manifest.json", async () => {
         await saveCopiedFilesFileAction({
             capability: AgentCapability.Skills,
             context: context,
@@ -165,8 +165,8 @@ describe("CopiedFilesFile.path matches where saveCopiedFilesFileAction writes", 
             mirroredFilePaths: [".test/skills/a/SKILL.md"],
         });
 
-        expect(await readFile(CopiedFilesFile.path(context), "utf8")).toContain(
-            ".test/skills/a/SKILL.md",
-        );
+        expect(
+            await readFile(SyncManifestFile.path(context), "utf8"),
+        ).toContain(".test/skills/a/SKILL.md");
     });
 });

@@ -10,7 +10,7 @@ description: Reverse-engineers a repo's scattered per-agent AI configuration (gu
 Same as `npx agenteq init` on a repo with no AI configuration.
 
 - Canonical source directory, default `.ai`: `GUIDELINES.md`, `mcp/<name>/config.json`, `commands/**`, `skills/**`, `references/**`.
-- `agenteq.json` recording chosen agents and capabilities.
+- `agenteq/config.json` recording chosen agents and capabilities.
 - Every generated per-agent file (`CLAUDE.md`, `.cursor/skills`, `.mcp.json`, etc.) gitignored.
 - No generated file tracked in git.
 

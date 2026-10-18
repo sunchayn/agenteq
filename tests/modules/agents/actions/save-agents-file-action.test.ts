@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import saveAgentsFileAction from "@agents/actions/save-agents-file-action.js";
 import AgentsFile from "@agents/entities/agents-file.js";
@@ -42,7 +42,7 @@ describe("saveAgentsFileAction", () => {
 
         const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(gitignore).toContain(".ai/agenteq.json");
+        expect(gitignore).toContain(relative(cwd, AgentsFile.path(context)));
     });
 
     it("does not touch .gitignore again on a subsequent write", async () => {

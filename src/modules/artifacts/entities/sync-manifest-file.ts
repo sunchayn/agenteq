@@ -3,16 +3,21 @@ import { z } from "zod";
 import type { RunContext } from "@shared/types/run-context.js";
 
 /**
- * Agenteq's own saved record of the content hash of every artifact written during the last sync.
- * Keyed by that artifact's path relative to the project root, saved at <source-dir>/agenteq-sync-manifest.json.
+ * Agenteq's own saved record of the last sync, saved at <source-dir>/agenteq/sync-manifest.json.
+ * Holds the necessary sync traces, such as content hashes, needed for some features to function.
  */
 export default class SyncManifestFile {
-    private static readonly FILENAME = "agenteq-sync-manifest.json";
+    private static readonly FILENAME = "agenteq/sync-manifest.json";
 
     readonly hashesByPath: Record<string, string>;
+    readonly pathsByCapability: Record<string, string[]>;
 
-    constructor(hashesByPath: Record<string, string> = {}) {
+    constructor(
+        hashesByPath: Record<string, string> = {},
+        pathsByCapability: Record<string, string[]> = {},
+    ) {
         this.hashesByPath = hashesByPath;
+        this.pathsByCapability = pathsByCapability;
     }
 
     static path(context: RunContext): string {
@@ -34,7 +39,10 @@ export default class SyncManifestFile {
         const result = syncManifestFileSchema.safeParse(parsed);
 
         return result.success
-            ? new SyncManifestFile(result.data.artifacts)
+            ? new SyncManifestFile(
+                  result.data.artifacts,
+                  result.data.pathsByCapability,
+              )
             : new SyncManifestFile();
     }
 
@@ -42,9 +50,35 @@ export default class SyncManifestFile {
         return this.hashesByPath[relPath];
     }
 
+    /**
+     * The paths recorded for one capability, or an empty array when none were recorded yet.
+     */
+    pathsFor(capability: string): string[] {
+        return this.pathsByCapability[capability] ?? [];
+    }
+
+    /**
+     * Returns a new file with the hashes replaced, capability paths untouched.
+     */
+    withHashes(hashesByPath: Record<string, string>): SyncManifestFile {
+        return new SyncManifestFile(hashesByPath, this.pathsByCapability);
+    }
+
+    /**
+     * Returns a new file with one capability's paths replaced, every other capability untouched.
+     * A capability never requested in a given sync run keeps whatever it last had.
+     */
+    withCapability(capability: string, paths: string[]): SyncManifestFile {
+        return new SyncManifestFile(this.hashesByPath, {
+            ...this.pathsByCapability,
+            [capability]: paths,
+        });
+    }
+
     serialize(): string {
         const body: SerializedSyncManifestFile = {
             artifacts: this.hashesByPath,
+            pathsByCapability: this.pathsByCapability,
         };
 
         return `${JSON.stringify(body, null, 2)}\n`;
@@ -57,8 +91,10 @@ export default class SyncManifestFile {
 
 interface SerializedSyncManifestFile {
     artifacts: Record<string, string>;
+    pathsByCapability: Record<string, string[]>;
 }
 
 const syncManifestFileSchema = z.object({
-    artifacts: z.record(z.string(), z.string()),
+    artifacts: z.record(z.string(), z.string()).default({}),
+    pathsByCapability: z.record(z.string(), z.array(z.string())).default({}),
 });
