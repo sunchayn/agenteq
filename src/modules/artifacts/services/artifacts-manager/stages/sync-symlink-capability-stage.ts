@@ -48,7 +48,7 @@ export default async function syncSymlinkCapabilityStage(
  * Interface & Types.
  */
 
-interface MirrorDirOptions {
+export interface MirrorDirOptions {
     sourceDir: string;
     targetDir: string;
     renameFile?: (file: string) => string;
@@ -413,7 +413,7 @@ function namespaceDirsFor(
  * Groups a remote's saved selection by namespace, stripping the namespace prefix off each entry.
  * An entry with no namespace prefix, a root-level item, groups under the empty namespace.
  */
-function groupByNamespace(selection: string[]): Map<string, string[]> {
+export function groupByNamespace(selection: string[]): Map<string, string[]> {
     const selectionByNamespace = new Map<string, string[]>();
 
     for (const entry of selection) {
@@ -450,7 +450,9 @@ function targetDirFor(
  * Writes a symlink per file by default, or a real file copy when copy mode is requested.
  * Returns the files mirrored and, in copy mode, the absolute target path of each copy written.
  */
-async function mirrorDir(options: MirrorDirOptions): Promise<MirrorDirResult> {
+export async function mirrorDir(
+    options: MirrorDirOptions,
+): Promise<MirrorDirResult> {
     const {
         filterFiles,
         isCopyMode,

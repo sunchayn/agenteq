@@ -33,6 +33,7 @@ interface WriteGuidelinesOptions {
     guidelinesPath: string;
     targetCwd: string;
     boostGuidelines?: string;
+    referenceAnnotationTable?: string;
     isDryRun?: boolean;
 }
 
@@ -69,10 +70,12 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
 
     const remoteUrls = remotesWithGuidelines.map((remote) => remote.url);
 
-    // A Boost-sourced block still needs distributing even with no hand-authored GUIDELINES.md yet.
+    // A Boost-sourced block or a reference mapping table still needs distributing,
+    // even with no hand-authored GUIDELINES.md file in place yet.
     if (
         !hasSource &&
         !payload.boostGuidelines &&
+        !payload.referenceAnnotationTable &&
         remoteSourcePaths.length === 0
     ) {
         return { artifactPaths: [], rows: [] };
@@ -97,6 +100,7 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
             boostGuidelines: payload.boostGuidelines,
             guidelinesPath: agent.guidelinesPath,
             isDryRun: payload.context.isDryRun,
+            referenceAnnotationTable: payload.referenceAnnotationTable,
             remoteSourcePaths: remoteSourcePaths,
             remoteUrls: remoteUrls,
             sourcePath: source,
@@ -139,6 +143,7 @@ async function writeGuidelines(
         boostGuidelines,
         guidelinesPath,
         isDryRun,
+        referenceAnnotationTable,
         remoteSourcePaths,
         remoteUrls,
         sourcePath,
@@ -165,7 +170,7 @@ async function writeGuidelines(
             ? `\n\n<laravel-boost-guidelines>\n${boostGuidelines}\n\n</laravel-boost-guidelines>\n`
             : "";
 
-        const content = `${remoteBlock}${raw}${boostBlock}${guidelinesSuffix({ remoteUrls: remoteUrls })}`;
+        const content = `${remoteBlock}${raw}${boostBlock}${referenceAnnotationTable ?? ""}${guidelinesSuffix({ remoteUrls: remoteUrls })}`;
 
         if (!isDryRun) {
             await filesystem.mkdir(dirname(target));

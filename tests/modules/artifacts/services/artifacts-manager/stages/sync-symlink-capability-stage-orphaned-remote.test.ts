@@ -62,6 +62,7 @@ describe("syncSymlinkCapabilityStage, a remote source removed between syncs", ()
                         commands: [],
                         guidelines: false,
                         mcp: [],
+                        references: [],
                         skills: ["remote-skill"],
                     },
                     url: "git@example.com:x/y.git",

@@ -3,4 +3,5 @@ export enum AgentCapability {
     Commands = "commands",
     Skills = "skills",
     Guidelines = "guidelines",
+    References = "references",
 }

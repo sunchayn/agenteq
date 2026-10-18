@@ -91,6 +91,7 @@ export interface RemoteSourceSelection {
     commands: string[];
     mcp: string[];
     guidelines: boolean;
+    references: string[];
 }
 
 interface SerializedRemoteSourcesFile {
@@ -101,6 +102,7 @@ const remoteSourceSelectionSchema = z.object({
     commands: z.array(z.string()),
     guidelines: z.boolean(),
     mcp: z.array(z.string()),
+    references: z.array(z.string()),
     skills: z.array(z.string()),
 });
 

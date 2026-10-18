@@ -362,6 +362,7 @@ describe("printSyncOutcome: skipped capabilities", () => {
             "commands",
             "skills",
             "guidelines",
+            "references",
         ]);
     });
 });

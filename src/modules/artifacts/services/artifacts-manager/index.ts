@@ -11,6 +11,7 @@ import warmUpBoostProjectStage from "./stages/warm-up-boost-project-stage.js";
 import resolveRemoteSourcesStage from "./stages/resolve-remote-sources-stage.js";
 import syncMcpStage from "./stages/sync-mcp-stage.js";
 import syncSymlinkCapabilityStage from "./stages/sync-symlink-capability-stage.js";
+import syncReferencesStage from "./stages/sync-references-stage.js";
 import syncGuidelinesStage from "./stages/sync-guidelines-stage.js";
 
 /**
@@ -59,6 +60,7 @@ async function sync(options: SyncOptions): Promise<SyncOutcome> {
     );
 
     payload = await syncSymlinkCapabilityStage(AgentCapability.Skills, payload);
+    payload = await syncReferencesStage(payload);
     payload = await syncGuidelinesStage(payload);
 
     if (!context.isDryRun) {

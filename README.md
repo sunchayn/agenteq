@@ -57,7 +57,7 @@ See [`examples/refactor-demo`](/examples/refactor-demo) for an example.
 
 ## Usage
 
-Agenteq syncs four capabilities. These are guidelines, MCP servers, skills, and commands.
+Agenteq syncs five capabilities. These are guidelines, MCP servers, skills, commands, and references. References have no per-agent target of their own, see [References](#references) below.
 
 The following commands are available.
 
@@ -103,16 +103,16 @@ The `sync` command also takes `--update-pins` (env: `AGENTEQ_UPDATE_PINS`), whic
 
 ### Options shared by `init` and `sync`
 
-| Flag                                      | What it does                                                                                                                                                                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--agents <a,b>`                          | Skip the picker and use exactly these agents, for example `--agents claude_code,cursor`.<br />Run `agenteq detect` for the exact agent names. Passing it to either `init` or `sync` saves this list as your new configuration. |
-| `--only <mcp,commands,skills,guidelines>` | Sync only some of the four capabilities instead of all of them, for example `--only guidelines,skills`.                                                                                                                        |
-| `--yes`                                   | Run without prompts.<br />If Agenteq cannot determine what to do automatically, it fails with an error instead.                                                                                                                |
-| `--json`                                  | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
-| `--source-dir <dir>`                      | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
-| `--skip-in-ci`                            | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
-| `--force`                                 | Overwrite an artifact even if it was hand-edited since the last sync. See [hand-edit protection](#hand-edit-protection) below.                                                                                                 |
-| `--copy`                                  | Materialize commands and skills as real file copies instead of symlinks. See [copy mode](#copy-mode) below.                                                                                                                    |
+| Flag                                                 | What it does                                                                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--agents <a,b>`                                     | Skip the picker and use exactly these agents, for example `--agents claude_code,cursor`.<br />Run `agenteq detect` for the exact agent names. Passing it to either `init` or `sync` saves this list as your new configuration. |
+| `--only <mcp,commands,skills,guidelines,references>` | Sync only some of the five capabilities instead of all of them, for example `--only guidelines,skills`.                                                                                                                        |
+| `--yes`                                              | Run without prompts.<br />If Agenteq cannot determine what to do automatically, it fails with an error instead.                                                                                                                |
+| `--json`                                             | Print the result as JSON instead of a table.<br />This only changes the output format. At a real terminal, the picker still shows unless `--yes` is also passed.                                                               |
+| `--source-dir <dir>`                                 | The canonical source directory. Defaults to `.ai`. Change this if you keep it elsewhere in your repo.                                                                                                                          |
+| `--skip-in-ci`                                       | Do nothing when run in a CI environment, instead of running.<br />Useful for a dependency manager or git hook that also runs in CI. CI is detected automatically.                                                              |
+| `--force`                                            | Overwrite an artifact even if it was hand-edited since the last sync. See [hand-edit protection](#hand-edit-protection) below.                                                                                                 |
+| `--copy`                                             | Materialize commands and skills as real file copies instead of symlinks. See [copy mode](#copy-mode) below.                                                                                                                    |
 
 Each flag above also has an environment variable equivalent, it might be useful for setting it once in CI:
 
@@ -228,6 +228,20 @@ Once pinned, `npx agenteq sync` never pulls past that tag on its own. If a newer
 npx agenteq sync --update-pins   # env: AGENTEQ_UPDATE_PINS
 ```
 
+### References
+
+A skill or `GUIDELINES.md` can point at shared content instead of duplicating it, using a `@reference(...)` annotation.
+
+```
+@reference(glossary/billing.md)                        # local, under .ai/references/
+@reference(backend::glossary/billing.md)               # from a remote source's "backend" namespace
+@reference(my-org:backend::glossary/billing.md)        # from a specific remote source, local config only
+```
+
+A local reference lives at `.ai/references/<path>`. A remote one is mirrored to `<source-dir>/references/remote/<remote-name>/<namespace>/<path>`, a folder Agenteq owns and gitignores, so you never check in the remote's copy. An annotation found in a skill or in `GUIDELINES.md` pulls its file into the mirror on its own. `--references`, or picking references in the picker, is only needed for a file no annotation points at.
+
+Every sync resolves each annotation found in a skill or in `GUIDELINES.md`, and appends a mapping table to the generated guidelines showing what each one resolved to.
+
 ### Consolidating drifted repos into one remote source
 
 If you already have several repos, each with their own scattered per-agent rules, and you'd rather share one canonical set of guidelines, skills, commands, and MCP servers between them, you don't need to reconcile each one by hand or build the remote source from scratch. Agenteq ships a skill for that. It generalizes what can be shared, leaves what can't, consolidates everything into one destination repo, and wires every source repo to it as a remote source.
@@ -294,10 +308,10 @@ If a command fails, the error message starts with a code in parentheses, for exa
 | Code                                 | What it means                                                                                                                                                                                                            |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `E_UNKNOWN_AGENT`                    | An agent name you passed, for example to `--agents`, does not match any supported agent. Run `agenteq detect` for the exact names.                                                                                       |
-| `E_UNKNOWN_CAPABILITY`               | A capability name you passed to `--only` does not match one of `mcp`, `commands`, `skills`, `guidelines`.                                                                                                                |
+| `E_UNKNOWN_CAPABILITY`               | A capability name you passed to `--only` does not match one of `mcp`, `commands`, `skills`, `guidelines`, `references`.                                                                                                  |
 | `E_HAND_EDITED_ARTIFACTS`            | An artifact Agenteq previously wrote was edited by hand since the last sync. See [hand-edit protection](#hand-edit-protection). Pass `--force` to overwrite it anyway.                                                   |
 | `E_INVALID_MCP_CONFIG`               | A file under `.ai/mcp/<name>/config.json` is not valid JSON, or does not match the shape described below.                                                                                                                |
-| `E_INVALID_REMOTE_SOURCE`            | The cloned repository has none of `mcp/`, `commands/`, `skills/`, or `GUIDELINES.md` at its root.                                                                                                                        |
+| `E_INVALID_REMOTE_SOURCE`            | The cloned repository has none of `mcp/`, `commands/`, `skills/`, `references/`, or `GUIDELINES.md` at its root.                                                                                                         |
 | `E_REMOTE_SOURCE_ALREADY_EXISTS`     | The `remote-source add` was given a name that's already configured. Remove it first, or pick a different name.                                                                                                           |
 | `E_REMOTE_SOURCE_URL_ALREADY_EXISTS` | `remote-source add` was given a git url that's already configured under another name. Use that remote, remove it first, or pick a different url.                                                                         |
 | `E_REMOTE_SOURCE_CLONE_FAILED`       | The `remote-source add` could not clone the given url, see the printed detail for the underlying git error.                                                                                                              |

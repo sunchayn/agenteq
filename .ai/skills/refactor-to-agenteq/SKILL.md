@@ -9,7 +9,7 @@ description: Reverse-engineers a repo's scattered per-agent AI configuration (gu
 
 Same as `npx agenteq init` on a repo with no AI configuration.
 
-- Canonical source directory, default `.ai`: `GUIDELINES.md`, `mcp/<name>/config.json`, `commands/**`, `skills/**`.
+- Canonical source directory, default `.ai`: `GUIDELINES.md`, `mcp/<name>/config.json`, `commands/**`, `skills/**`, `references/**`.
 - `agenteq.json` recording chosen agents and capabilities.
 - Every generated per-agent file (`CLAUDE.md`, `.cursor/skills`, `.mcp.json`, etc.) gitignored.
 - No generated file tracked in git.
@@ -42,11 +42,19 @@ Read the primary agent's guidelines file (Guidelines column). Write it to `<sour
 
 If the table lists a skills directory for the primary agent and it exists, copy each skill directory into `<source dir>/skills/`, keeping directory name and `SKILL.md`. Skip a symlink pointing outside the repo or into another tool's cache. That is not hand-authored content.
 
-### 4.3 Commands
+### 4.3 References
+
+While reading the guidelines file and each skill's body (4.1, 4.2), look for a link to another local file: a path, not a URL. That file is a reference, not inline guidance.
+
+Move the linked file to `<source dir>/references/<same relative path, or a short descriptive one if the original has none>`. Rewrite the link in the guidelines or skill body as `@reference(<that path>)`. Do not leave the old link and the annotation both present.
+
+Skip a link that already points inside `<source dir>/references/`, or that already reads as a `@reference(...)` annotation. Both are already canonical.
+
+### 4.4 Commands
 
 If the table lists a commands directory for the primary agent and it exists, copy each command file into `<source dir>/commands/`. If the table shows a non-`.md` extension, rename back to `.md`.
 
-### 4.4 MCP servers
+### 4.5 MCP servers
 
 If the table lists an MCP config file for the primary agent and it exists:
 
@@ -81,7 +89,7 @@ Run `npx agenteq detect --json`. Each entry with `projectInstalled: true`, other
 1. Read its guidelines file, skills, commands, MCP config, same as step 4.
 2. Compare against what step 4 wrote.
 3. File matches, or agent's file is empty or missing: do nothing. `agenteq sync` regenerates it.
-4. File differs (guidelines content, extra or missing skill, extra or missing command, MCP server missing from the canonical set): stop and ask the user. Show the actual diff, not only that one exists. Offer: fold the extra content into the canonical source, keep the canonical version, or skip and flag it in the final report. Never guess silently.
+4. File differs (guidelines content, extra or missing skill, extra or missing command, extra or missing reference, MCP server missing from the canonical set): stop and ask the user. Show the actual diff, not only that one exists. Offer: fold the extra content into the canonical source, keep the canonical version, or skip and flag it in the final report. Never guess silently.
 
 After every deviation is resolved, the canonical directory is the agreed source of truth.
 

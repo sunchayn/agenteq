@@ -1,14 +1,14 @@
 ---
 name: consolidate-repos-to-agenteq
-description: Refactors every source repository to agenteq first, using refactor-to-agenteq or add-agenteq-to-boost-project as needed, then consolidates their shared guidelines, skills, commands, and MCP servers into one destination repository. Generalizes shareable content and leaves the rest. Wires every source repository to the destination as an agenteq remote source. Works on any repository, not only ones that already use agenteq.
+description: Refactors every source repository to agenteq first, using refactor-to-agenteq or add-agenteq-to-boost-project as needed, then consolidates their shared guidelines, skills, commands, references, and MCP servers into one destination repository. Generalizes shareable content and leaves the rest. Wires every source repository to the destination as an agenteq remote source. Works on any repository, not only ones that already use agenteq.
 ---
 
 # Consolidating Repositories into One agenteq Remote Source
 
 ## 1. End state
 
-- Every source repository refactored to agenteq's canonical structure, if it was not already. Its scattered per-agent files are gone. Its canonical source directory holds its guidelines, skills, commands, MCP servers.
-- A destination repository with `mcp/<name>/config.json`, `commands/**`, `skills/**`, `GUIDELINES.md` at its root (agenteq's remote source layout). It holds shared content from every source repository, generalized so no single repository owns it. The destination is a pure content source. It never runs `agenteq`. No `.ai/`, no `agenteq.json`, no generated per-agent files.
+- Every source repository refactored to agenteq's canonical structure, if it was not already. Its scattered per-agent files are gone. Its canonical source directory holds its guidelines, skills, commands, references, MCP servers.
+- A destination repository with `mcp/<name>/config.json`, `commands/**`, `skills/**`, `references/**`, `GUIDELINES.md` at its root (agenteq's remote source layout). It holds shared content from every source repository, generalized so no single repository owns it. The destination is a pure content source. It never runs `agenteq`. No `.ai/`, no `agenteq.json`, no generated per-agent files.
 - Each source repository keeps only its own content. Shareable content moves to the destination. Nothing shareable is duplicated.
 - Each source repository has a named remote source pointing at the destination, in its canonical source directory's `remote-sources.json`. The real `agenteq` CLI does the sync.
 - A consolidation report listing everything that could not be safely generalized, and how the user resolved each.
@@ -65,7 +65,7 @@ For each source repository:
 3. Tell the user which repository you are about to refactor and which skill will run. Invoke the skill and follow it to completion, except skip its hook-setup step. Step 13 sets up hooks for every repository once. Running the other skill's hook step too would add the same hook twice.
 4. Note which skill you used and which canonical source directory it chose (`.ai` by default). Later steps and the step 15 report need both.
 
-After this step, every source repository has a canonical source directory with its guidelines, skills, commands, MCP servers in agenteq's shape. Every native per-agent file is gone or gitignored.
+After this step, every source repository has a canonical source directory with its guidelines, skills, commands, references, MCP servers in agenteq's shape. Every native per-agent file is gone or gitignored.
 
 ## 6. Read each source repository's canonical artifacts
 
@@ -76,6 +76,7 @@ Read:
 - `GUIDELINES.md`, if present.
 - Every skill directory under `skills/`.
 - Every command file under `commands/`.
+- Every file under `references/`.
 - Every `mcp/<key>/config.json`, already canonical. Directory name is the entry key. No separate `"key"` field:
 
 ```json
@@ -102,19 +103,25 @@ For each artifact you decide not to migrate, append an entry to the step 4 repor
 
 MCP servers rarely need rewriting. Their `config` is just `command`, `args`, `env`, `cwd`, or `url`, `headers`. Still check whether `command` or `args` names a script that exists only in this repository. If so, log it to the report the same way.
 
+A skill's or `GUIDELINES.md`'s `@reference(...)` annotation needs its own check:
+
+- A bare `@reference(path)` or namespaced `@reference(namespace::path)` form travels unchanged. It still resolves once moved, the same way it does in the source repository.
+- A remote-qualified `@reference(remote:namespace::path)` form names one specific remote source configured in this source repository. It does not travel. Rewrite it to the bare or namespaced form if the file it points at is being generalized too, or log the whole skill as not generalizable if it cannot be, and say why.
+- A skill moves to the destination only together with every reference file it annotates. Generalize and migrate them in the same step. Never migrate a skill while leaving a reference it needs behind.
+
 While generalizing, compare each artifact's name (skill directory name, command file name, MCP server key) against every artifact already staged from earlier repositories in this run. Same name and content: keep one copy. Same name, different content: stop and ask the user. Options: merge, keep one repository's version, keep both under distinct names, or drop one. Resolve now in conversation. Do not add it to the report. The step 4 report covers content that could not be generalized, not naming conflicts.
 
 ## 8. Write resolved artifacts into the destination
 
-Write every artifact that survived step 7 (generalized, no naming conflict) at the destination's root: `mcp/<key>/config.json`, `commands/*.md`, `skills/<name>/`. Merge guideline text into `GUIDELINES.md`. Do not nest anything under `.ai/`. Do not run `agenteq init` or `agenteq sync` in the destination. It is a remote source for other repositories, not a project syncing its own agents. No `agenteq.json`, no per-agent files, no gitignore entries for them.
+Write every artifact that survived step 7 (generalized, no naming conflict) at the destination's root: `mcp/<key>/config.json`, `commands/*.md`, `skills/<name>/`, `references/<path>`. Merge guideline text into `GUIDELINES.md`. Do not nest anything under `.ai/`. Do not run `agenteq init` or `agenteq sync` in the destination. It is a remote source for other repositories, not a project syncing its own agents. No `agenteq.json`, no per-agent files, no gitignore entries for them.
 
 Writing at the destination's root, with no namespace folder, resolves as root capabilities, the same meaning `.shared` carries once namespace folders exist. Destination already namespaced, or this run adds one. Write under `.shared/` instead of the bare root, so root capabilities group with the namespaces instead of sitting awkwardly next to them. No namespace folders yet. Keep writing at the root.
 
-Every MCP server from every source repository always migrates to the destination. There is no option to keep an MCP server local. Skills, guidelines, and commands can stay local (step 10).
+Every MCP server from every source repository always migrates to the destination. There is no option to keep an MCP server local. Skills, guidelines, commands, and references can stay local (step 10).
 
 ## 9. Push the destination
 
-After every source repository is agenteq-ready, classified, generalized, and written into the destination, commit the destination's `mcp/`, `commands/`, `skills/`, and `GUIDELINES.md`. Suggest a commit message and ask the user to confirm or pick another. Push to the empty remote from step 3.
+After every source repository is agenteq-ready, classified, generalized, and written into the destination, commit the destination's `mcp/`, `commands/`, `skills/`, `references/`, and `GUIDELINES.md`. Suggest a commit message and ask the user to confirm or pick another. Push to the empty remote from step 3.
 
 Do this before step 12. Each source repository's `remote-source add` needs real reachable content at the remote URL, and reuses this local working copy as its clone. The push must land before any source repository is wired.
 
@@ -136,7 +143,7 @@ For each source repository:
 
 1. Remove from this repository's canonical source directory anything that migrated to the destination in step 8. Keep only what step 10 decided stays local. The directory now holds only this repository's own content.
 2. Run `npx agenteq remote-source add <name> <destination-git-url> --yes --source-dir <this repository's canonical source directory> --path <destination-local-path>` inside this repository. Use the exact local path the destination was built at in step 3. `--path` reuses the already-pushed working copy instead of cloning the same content per repository. The run is non-interactive, so it selects every capability from the destination by default.
-3. Open this repository's `remote-sources.json`. Edit the new entry's `selection` field by hand: the exact subset of skills, commands, MCP servers, plus the guidelines boolean, this repository should pull. The previous command could not prompt for this. This file edit is how a repository ends up with less than everything the destination offers. Default to everything. Ask the user only if the subset is genuinely ambiguous.
+3. Open this repository's `remote-sources.json`. Edit the new entry's `selection` field by hand: the exact subset of skills, commands, references, MCP servers, plus the guidelines boolean, this repository should pull. The previous command could not prompt for this. This file edit is how a repository ends up with less than everything the destination offers. Default to everything. Ask the user only if the subset is genuinely ambiguous.
 4. Run `npx agenteq sync --yes` inside this repository, then confirm the result with `git status`. Step 5 already ran `agenteq init` here, so `sync` reuses its saved agent list. `agenteq sync` warns, with a `git rm -r --cached <paths>` fix, about any newly ignored path that git already tracked (e.g. a file removed in item 1 that a remote artifact now replaces). Run that fix whenever it appears. Show it to the user first. Never leave that warning unresolved.
 
 ## 13. Set up hooks to keep sync current
@@ -158,7 +165,7 @@ A repository has none: ask the user which hook manager to install, or whether to
 
 In every source repository, `agenteq sync` overwrites a file at each agent's target path when the canonical source (local or remote) has a match. It never deletes a generated file with no counterpart left in that source, e.g. a skill directory step 10 chose not to keep anywhere. List such files. Ask the user before deleting.
 
-In the destination the risk differs: content written by an earlier interrupted run of step 8 that a later run no longer produces, e.g. an artifact step 11 dropped. List anything under the destination's `mcp/`, `commands/`, `skills/`, or `GUIDELINES.md` that no artifact from this run accounts for. Ask the user before deleting. Never delete silently.
+In the destination the risk differs: content written by an earlier interrupted run of step 8 that a later run no longer produces, e.g. an artifact step 11 dropped. List anything under the destination's `mcp/`, `commands/`, `skills/`, `references/`, or `GUIDELINES.md` that no artifact from this run accounts for. Ask the user before deleting. Never delete silently.
 
 ## 15. Report back
 

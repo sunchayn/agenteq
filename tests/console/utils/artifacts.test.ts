@@ -123,6 +123,7 @@ describe("resolveCapabilities", () => {
                     AgentCapability.Mcp,
                     AgentCapability.Commands,
                     AgentCapability.Guidelines,
+                    AgentCapability.References,
                 ],
                 isDirty: true,
             });

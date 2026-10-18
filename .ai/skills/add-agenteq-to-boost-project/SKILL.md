@@ -7,11 +7,11 @@ description: Wires agenteq onto a Laravel project that already runs Laravel Boos
 
 ## 1. End state
 
-- `.ai/GUIDELINES.md` holds only hand-authored project guidance. Never Boost's `<laravel-boost-guidelines>` block.
+- `.ai/GUIDELINES.md` holds only hand-authored project guidance. Never Boost's `<laravel-boost-guidelines>` block. A local file it linked to now lives under `.ai/references/`, pointed at with `@reference(...)`.
 - `.ai/mcp/<name>/config.json` for every MCP server configured for any agent. Includes `.ai/mcp/laravel-boost/config.json` when Boost's MCP server is in use.
 - `.ai/commands/**` for every command file configured for any agent. Boost has no commands feature, so all found commands are hand-authored.
 - `.ai/skills/`, `.ai/guidelines/`, `.ai/rules` untouched. They are Boost's directories, not agenteq's. agenteq detects `boost.json`'s `skills` field and drops the `skills` capability for this project. Boost alone manages skills.
-- `agenteq.json` with chosen agents and capabilities `mcp`, `commands`, `guidelines`. No `skills`.
+- `agenteq.json` with chosen agents and capabilities `mcp`, `commands`, `guidelines`, `references`. No `skills`.
 - Every generated per-agent file gitignored, including Boost's per-agent files not already ignored.
 - Boost's composer `post-install-cmd`/`post-update-cmd` extended to run `npx agenteq sync --yes --skip-in-ci` right after Boost's command, when that wiring exists.
 - Any existing git hook that calls Boost extended the same way.
@@ -55,6 +55,8 @@ Strip the `<laravel-boost-guidelines>...</laravel-boost-guidelines>` block, matc
 Text outside the block is hand-authored guidance. Boost does not write or modify it. Merge it into `.ai/GUIDELINES.md`. If it differs between two agents' files, show the user the actual difference and ask. Do not guess.
 
 Nothing left after stripping: leave `.ai/GUIDELINES.md` unwritten. No empty placeholder. `agenteq sync` adds Boost's block over a missing source file.
+
+While merging, look for a link to another local file in the hand-authored text: a path, not a URL. Move that file to `.ai/references/<same relative path, or a short descriptive one if the original has none>`. Rewrite the link as `@reference(<that path>)`. Skip a link already pointing inside `.ai/references/`, or already written as an annotation.
 
 ## 6. Reconcile MCP servers, including Boost's own
 

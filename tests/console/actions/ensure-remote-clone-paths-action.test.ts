@@ -9,7 +9,13 @@ import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-
 import AgentsFile from "@agents/entities/agents-file.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
-const selection = { commands: [], guidelines: true, mcp: [], skills: [] };
+const selection = {
+    commands: [],
+    guidelines: true,
+    mcp: [],
+    references: [],
+    skills: [],
+};
 
 let cwd: string;
 let context: RunContext;

@@ -24,6 +24,7 @@ describe("discoverRemoteCapabilitiesAction", () => {
             commands: [],
             hasGuidelines: false,
             mcp: [],
+            references: [],
             skills: [],
         });
     });
@@ -71,6 +72,46 @@ describe("discoverRemoteCapabilitiesAction", () => {
         });
 
         expect(result.mcp).toEqual(["context7"]);
+    });
+
+    it("lists every reference file under references/", async () => {
+        await mkdir(join(rootDir, "references/glossary"), { recursive: true });
+        await writeFile(
+            join(rootDir, "references/glossary/billing.md"),
+            "hello",
+        );
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.references).toEqual(["glossary/billing.md"]);
+    });
+
+    it("namespaces a reference file nested under a classified sub-folder, alongside a root one", async () => {
+        await mkdir(join(rootDir, "references/glossary"), { recursive: true });
+        await writeFile(
+            join(rootDir, "references/glossary/billing.md"),
+            "hello",
+        );
+
+        await mkdir(join(rootDir, "backend/references/glossary"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(rootDir, "backend/references/glossary/billing.md"),
+            "hello",
+        );
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.references.sort()).toEqual([
+            "backend::glossary/billing.md",
+            "glossary/billing.md",
+        ]);
     });
 
     it("reports guidelines as present when GUIDELINES.md exists at the root", async () => {
@@ -204,6 +245,7 @@ describe("discoverRemoteCapabilitiesAction", () => {
             commands: [],
             hasGuidelines: false,
             mcp: [],
+            references: [],
             skills: [],
         });
     });
@@ -222,6 +264,7 @@ describe("discoverRemoteCapabilitiesAction", () => {
             commands: [],
             hasGuidelines: false,
             mcp: [],
+            references: [],
             skills: [],
         });
     });
