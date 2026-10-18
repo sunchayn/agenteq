@@ -14,6 +14,7 @@ import {
 import {
     extractReferenceAnnotations,
     parseReferenceAnnotation,
+    REMOTE_REFERENCES_DIR,
 } from "@artifacts/actions/resolve-reference-annotation-action.js";
 import resolveReferenceAnnotationAction from "@artifacts/actions/resolve-reference-annotation-action.js";
 import {
@@ -276,7 +277,7 @@ async function mirrorReferences(
                 targetDir: join(
                     cwd,
                     sourceDir,
-                    "references/remote",
+                    REMOTE_REFERENCES_DIR,
                     remote.name,
                     namespace,
                 ),
@@ -290,7 +291,7 @@ async function mirrorReferences(
         return { artifactPaths: [], fileCount: 0 };
     }
 
-    const targetRelDir = join(sourceDir, "references/remote");
+    const targetRelDir = join(sourceDir, REMOTE_REFERENCES_DIR);
 
     // A dry run only reports the file count, it never touches .gitignore.
     if (!isDryRun) {

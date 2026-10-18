@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import RemoteSourcesFile from "@artifacts/entities/remote-sources-file.js";
@@ -69,7 +69,9 @@ describe("saveRemoteSourcesFileAction", () => {
 
         const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(gitignore).toContain(".ai/remote-sources.json");
+        expect(gitignore).toContain(
+            relative(cwd, RemoteSourcesFile.path(context)),
+        );
     });
 
     it("does not touch .gitignore again on a subsequent write", async () => {

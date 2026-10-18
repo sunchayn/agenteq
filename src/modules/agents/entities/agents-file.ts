@@ -5,10 +5,10 @@ import type { RunContext } from "@shared/types/run-context.js";
 /**
  * Agenteq's own saved file listing which agents and capabilities a project uses.
  * It also holds where this machine keeps each remote source's clone.
- * The file is saved at <source-dir>/agenteq.json.
+ * The file is saved at <source-dir>/agenteq/config.json.
  */
 export default class AgentsFile {
-    private static readonly FILENAME = "agenteq.json";
+    private static readonly FILENAME = "agenteq/config.json";
 
     readonly agentNames: string[];
 

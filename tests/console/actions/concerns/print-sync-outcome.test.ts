@@ -5,6 +5,7 @@ import { SyncOutcome } from "@artifacts/data-transfer-objects/sync-outcome.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
+import AgentsFile from "@agents/entities/agents-file.js";
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -169,17 +170,19 @@ describe("printSyncOutcome: gitignore alerts", () => {
             .spyOn(output, "warn")
             .mockImplementation(() => undefined);
 
+        const agentsFilePath = AgentsFile.path({ cwd: "", sourceDir: ".ai" });
+
         printSyncOutcome({
             outcome: new SyncOutcome({
                 requestedCapabilities: Object.values(AgentCapability),
-                gitignoreAlerts: [".ai/agenteq.json"],
+                gitignoreAlerts: [agentsFilePath],
                 results: [row(SyncStatus.Written)],
                 sourceDir: ".ai",
             }),
         });
 
         expect(warnSpy).toHaveBeenCalledWith(
-            expect.stringContaining("git rm -r --cached .ai/agenteq.json"),
+            expect.stringContaining(`git rm -r --cached ${agentsFilePath}`),
         );
     });
 });

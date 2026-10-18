@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import saveSyncManifestFileAction from "@artifacts/actions/save-sync-manifest-file-action.js";
 import loadSyncManifestFileAction from "@artifacts/actions/load-sync-manifest-file-action.js";
+import saveCopiedFilesFileAction from "@artifacts/actions/save-copied-files-file-action.js";
 import SyncManifestFile from "@artifacts/entities/sync-manifest-file.js";
 import { hashContent } from "@support/utils/hash-content.js";
+import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
 let cwd: string;
@@ -103,21 +105,43 @@ describe("saveSyncManifestFileAction", () => {
         });
 
         const gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
+        const relManifestPath = relative(cwd, SyncManifestFile.path(context));
 
         const occurrences = gitignore
             .split("\n")
-            .filter(
-                (line) =>
-                    line === "agenteq-sync-manifest.json" ||
-                    line.endsWith("/agenteq-sync-manifest.json"),
-            );
+            .filter((line) => line === relManifestPath);
 
         expect(occurrences).toHaveLength(1);
+    });
+
+    it("preserves a previously saved capability's copied paths", async () => {
+        await saveCopiedFilesFileAction({
+            capability: AgentCapability.Skills,
+            context: context,
+            copiedFilePaths: [".test/skills/a/SKILL.md"],
+            mirroredFilePaths: [".test/skills/a/SKILL.md"],
+        });
+
+        await writeFile(join(cwd, "CLAUDE.md"), "hello");
+
+        await saveSyncManifestFileAction({
+            artifactPaths: ["CLAUDE.md"],
+            context: context,
+        });
+
+        const manifest = await loadSyncManifestFileAction({
+            context: context,
+        });
+
+        expect(manifest.hashFor("CLAUDE.md")).toBe(hashContent("hello"));
+        expect(manifest.pathsFor(AgentCapability.Skills)).toEqual([
+            ".test/skills/a/SKILL.md",
+        ]);
     });
 });
 
 describe("SyncManifestFile.path matches where saveSyncManifestFileAction writes", () => {
-    it("writes under <source-dir>/agenteq-sync-manifest.json", async () => {
+    it("writes under <source-dir>/agenteq/sync-manifest.json", async () => {
         await writeFile(join(cwd, "CLAUDE.md"), "hello");
 
         await saveSyncManifestFileAction({

@@ -30,7 +30,7 @@ export default async function saveSyncManifestFileAction(
     }
 
     await writeTrackedStateFileAction({
-        content: new SyncManifestFile(hashesByPath).serialize(),
+        content: existing.withHashes(hashesByPath).serialize(),
         context: context,
         path: SyncManifestFile.path(context),
     });

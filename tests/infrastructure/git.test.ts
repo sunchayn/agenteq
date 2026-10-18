@@ -45,50 +45,50 @@ describe("git.ignore", () => {
     });
 
     it("creates .gitignore when it doesn't exist", async () => {
-        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
+        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq/config.json" });
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(contents).toBe(".ai/agenteq.json\n");
+        expect(contents).toBe(".ai/agenteq/config.json\n");
     });
 
     it("appends to an existing .gitignore", async () => {
         await writeFile(join(cwd, ".gitignore"), "node_modules/\n", "utf8");
-        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
+        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq/config.json" });
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(contents).toBe("node_modules/\n.ai/agenteq.json\n");
+        expect(contents).toBe("node_modules/\n.ai/agenteq/config.json\n");
     });
 
     it("does not duplicate an already-present line", async () => {
         await writeFile(
             join(cwd, ".gitignore"),
-            "node_modules/\n.ai/agenteq.json\n",
+            "node_modules/\n.ai/agenteq/config.json\n",
             "utf8",
         );
 
-        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
+        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq/config.json" });
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(contents).toBe("node_modules/\n.ai/agenteq.json\n");
+        expect(contents).toBe("node_modules/\n.ai/agenteq/config.json\n");
     });
 
     it("matches on a trimmed comparison", async () => {
         await writeFile(
             join(cwd, ".gitignore"),
-            "node_modules/\n.ai/agenteq.json  \n",
+            "node_modules/\n.ai/agenteq/config.json  \n",
             "utf8",
         );
 
-        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
+        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq/config.json" });
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
 
-        expect(contents).toBe("node_modules/\n.ai/agenteq.json  \n");
+        expect(contents).toBe("node_modules/\n.ai/agenteq/config.json  \n");
     });
 
     it("does not add a line when a parent folder is already ignored", async () => {
         await writeFile(join(cwd, ".gitignore"), ".ai/\n", "utf8");
 
-        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq.json" });
+        await git.ignore({ cwd: cwd, relPath: ".ai/agenteq/config.json" });
         const contents = await readFile(join(cwd, ".gitignore"), "utf8");
 
         expect(contents).toBe(".ai/\n");

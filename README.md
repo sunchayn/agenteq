@@ -127,14 +127,14 @@ Each flag above also has an environment variable equivalent, it might be useful 
 
 A CLI flag always overrides its matching environment variable.
 
-The saved choice is stored at `<source-dir>/agenteq.json`. It is per developer and per machine, not shared through git. The first time Agenteq generates it, it also adds the path to `.gitignore`.
+The saved choice is stored at `<source-dir>/agenteq/config.json`. It is per developer and per machine, not shared through git. The first time Agenteq generates it, it also adds the path to `.gitignore`.
 
 > [!TIP]
 > In CI, if no agents are configured, no file is saved, and `--agents` is not set, `sync` fails immediately with an error instead. Passing `--agents`, or setting `AGENTEQ_AGENTS`, avoids this.<br />CI is detected automatically, and you can also force this same non-interactive behavior with `--yes` or `--json`.
 
 ### Hand-edit protection
 
-After every sync, Agenteq saves the content hash of every artifact it wrote, at `<source-dir>/agenteq-sync-manifest.json`. The next time you run `init` or `sync`, it checks each previously written artifact's current content against that saved hash. If an artifact such as `CLAUDE.md` or `.cursor/mcp.json` was edited by hand since the last sync, Agenteq stops before overwriting anything and lists which file(s) were edited.
+After every sync, Agenteq saves the content hash of every artifact it wrote, at `<source-dir>/agenteq/sync-manifest.json`. The next time you run `init` or `sync`, it checks each previously written artifact's current content against that saved hash. If an artifact such as `CLAUDE.md` or `.cursor/mcp.json` was edited by hand since the last sync, Agenteq stops before overwriting anything and lists which file(s) were edited.
 
 Pass `--force` (env: `AGENTEQ_FORCE`) to overwrite anyway.
 
@@ -210,7 +210,7 @@ npx agenteq remote-source remove <name>           # deattach it from Agenteq
 > [!NOTE]
 > `update-choices` always needs an interactive terminal for its picker.
 
-The clone location is personal to each machine. It is saved in `<source-dir>/agenteq.json`, which is not shared through git, and never in `remote-sources.json`. Someone who pulls your `remote-sources.json` is asked where to clone each remote the first time they run `npx agenteq sync`. With `--yes` or in CI, the default `~/.agenteq/sources/<name>` is used.
+The clone location is personal to each machine. It is saved in `<source-dir>/agenteq/config.json`, which is not shared through git, and never in `agenteq/remote-sources.json`. Someone who pulls your `agenteq/remote-sources.json` is asked where to clone each remote the first time they run `npx agenteq sync`. With `--yes` or in CI, the default `~/.agenteq/sources/<name>` is used.
 
 #### Pinning a remote source to a release
 
@@ -238,7 +238,7 @@ A skill or `GUIDELINES.md` can point at shared content instead of duplicating it
 @reference(my-org:backend::glossary/billing.md)        # from a specific remote source, local config only
 ```
 
-A local reference lives at `.ai/references/<path>`. A remote one is mirrored to `<source-dir>/references/remote/<remote-name>/<namespace>/<path>`, a folder Agenteq owns and gitignores, so you never check in the remote's copy. An annotation found in a skill or in `GUIDELINES.md` pulls its file into the mirror on its own. `--references`, or picking references in the picker, is only needed for a file no annotation points at.
+A local reference lives at `.ai/references/<path>`. A remote one is mirrored to `<source-dir>/agenteq/remote-references/<remote-name>/<namespace>/<path>`, a folder Agenteq owns and gitignores, so you never check in the remote's copy. An annotation found in a skill or in `GUIDELINES.md` pulls its file into the mirror on its own. `--references`, or picking references in the picker, is only needed for a file no annotation points at.
 
 Every sync resolves each annotation found in a skill or in `GUIDELINES.md`, and appends a mapping table to the generated guidelines showing what each one resolved to.
 

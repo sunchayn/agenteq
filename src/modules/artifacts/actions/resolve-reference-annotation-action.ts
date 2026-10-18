@@ -9,6 +9,11 @@ import { NAMESPACE_SEPARATOR } from "@artifacts/actions/discover-remote-capabili
 const REFERENCE_ANNOTATION_PATTERN = /@reference\(([^)]+)\)/g;
 
 /**
+ * Where every remote source's mirrored reference files land, relative to the source dir.
+ */
+export const REMOTE_REFERENCES_DIR = "agenteq/remote-references";
+
+/**
  * Finds every "@reference(...)" annotation body in a piece of text, deduplicated.
  */
 export function extractReferenceAnnotations(content: string): string[] {
@@ -142,7 +147,7 @@ function remotePath(
 ): string {
     return join(
         context.sourceDir,
-        "references/remote",
+        REMOTE_REFERENCES_DIR,
         remote,
         namespace ?? "",
         path,
