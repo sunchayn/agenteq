@@ -1,9 +1,9 @@
-import { dirname, join, relative } from "node:path";
+import { join } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
-import git from "@infrastructure/git.js";
 import { hashContent } from "@support/utils/hash-content.js";
 import SyncManifestFile from "@artifacts/entities/sync-manifest-file.js";
 import loadSyncManifestFileAction from "@artifacts/actions/load-sync-manifest-file-action.js";
+import writeTrackedStateFileAction from "@shared/actions/write-tracked-state-file-action.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
 /**
@@ -29,22 +29,11 @@ export default async function saveSyncManifestFileAction(
         hashesByPath[relPath] = hashContent(content);
     }
 
-    const path = SyncManifestFile.path(context);
-    const existedBefore = await filesystem.exists(path);
-
-    await filesystem.mkdir(dirname(path));
-
-    await filesystem.writeFile({
+    await writeTrackedStateFileAction({
         content: new SyncManifestFile(hashesByPath).serialize(),
-        path: path,
+        context: context,
+        path: SyncManifestFile.path(context),
     });
-
-    if (!existedBefore) {
-        await git.ignore({
-            cwd: context.cwd,
-            relPath: relative(context.cwd, path),
-        });
-    }
 }
 
 /*

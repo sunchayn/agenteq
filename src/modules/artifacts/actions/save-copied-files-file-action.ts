@@ -1,8 +1,8 @@
-import { dirname, join, relative } from "node:path";
+import { join } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
-import git from "@infrastructure/git.js";
 import CopiedFilesFile from "@artifacts/entities/copied-files-file.js";
 import loadCopiedFilesFileAction from "./load-copied-files-file-action.js";
+import writeTrackedStateFileAction from "@shared/actions/write-tracked-state-file-action.js";
 import type { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
@@ -35,22 +35,11 @@ export default async function saveCopiedFilesFileAction(
 
     const updated = existing.withCapability(capability, copiedFilePaths);
 
-    const path = CopiedFilesFile.path(context);
-    const existedBefore = await filesystem.exists(path);
-
-    await filesystem.mkdir(dirname(path));
-
-    await filesystem.writeFile({
+    await writeTrackedStateFileAction({
         content: updated.serialize(),
-        path: path,
+        context: context,
+        path: CopiedFilesFile.path(context),
     });
-
-    if (!existedBefore) {
-        await git.ignore({
-            cwd: context.cwd,
-            relPath: relative(context.cwd, path),
-        });
-    }
 }
 
 /*
