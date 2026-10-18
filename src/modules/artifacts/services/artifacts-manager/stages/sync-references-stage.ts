@@ -251,6 +251,7 @@ async function mirrorReferences(
     mirrorTargets: Map<string, Set<string>>,
 ): Promise<MirrorReferencesResult> {
     const { cwd, isDryRun, sourceDir } = payload.context;
+    const { isCopyMode } = payload;
     let fileCount = 0;
 
     for (const remote of payload.remoteSources) {
@@ -265,6 +266,7 @@ async function mirrorReferences(
         for (const [namespace, names] of byNamespace) {
             const { files } = await mirrorDir({
                 filterFiles: (file) => names.includes(file),
+                isCopyMode: isCopyMode,
                 isDryRun: isDryRun,
                 sourceDir: join(
                     remote.rootDir,

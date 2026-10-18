@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+    lstat,
+    mkdir,
+    mkdtemp,
+    readFile,
+    rm,
+    writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -38,10 +45,12 @@ describe("syncReferencesStage", () => {
 
     function payloadFor(
         remoteSources: ResolvedRemoteSource[] = [],
+        isCopyMode = false,
     ): SyncPayload {
         return new SyncPayload({
             capabilities: [AgentCapability.References],
             context: { cwd: cwd, sourceDir: ".ai" },
+            isCopyMode: isCopyMode,
             remoteSources: remoteSources,
             selectedAgents: [testAgent],
         });
@@ -136,5 +145,50 @@ describe("syncReferencesStage", () => {
         );
 
         expect(mirrored).toBe("Billing terms.");
+    });
+
+    it("mirrors a remote reference as a real file copy when copy mode is requested", async () => {
+        await mkdir(join(remoteRoot, "glossary/references"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "glossary/references/billing.md"),
+            "Billing terms.",
+        );
+
+        await mkdir(join(cwd, ".ai/skills/billing"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/skills/billing/SKILL.md"),
+            "See @reference(team:glossary::billing.md) for terms.",
+        );
+
+        await syncReferencesStage(
+            payloadFor(
+                [
+                    {
+                        name: "team",
+                        rootDir: remoteRoot,
+                        selection: {
+                            commands: [],
+                            guidelines: false,
+                            mcp: [],
+                            references: [],
+                            skills: [],
+                        },
+                        url: "git@example.com/team.git",
+                    },
+                ],
+                true,
+            ),
+        );
+
+        const target = join(
+            cwd,
+            ".ai/references/remote/team/glossary/billing.md",
+        );
+
+        expect((await lstat(target)).isSymbolicLink()).toBe(false);
+        expect(await readFile(target, "utf8")).toBe("Billing terms.");
     });
 });
