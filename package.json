@@ -56,6 +56,7 @@
         "agenteq": "tsx src/cli.ts"
     },
     "dependencies": {
+        "@clack/core": "^1.4.3",
         "@clack/prompts": "^1.7.0",
         "commander": "^12.1.0",
         "fast-glob": "^3.3.3",

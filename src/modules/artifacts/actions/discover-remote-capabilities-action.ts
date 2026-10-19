@@ -11,7 +11,7 @@ import { AgentCapability } from "@artifacts/enums/agent-capability.js";
  * A capability this action knows how to find under a classified sub-folder.
  * Guidelines is deliberately excluded, it stays a single root-level file, never folder-classified.
  */
-type FolderCapability =
+export type FolderCapability =
     | AgentCapability.Skills
     | AgentCapability.Commands
     | AgentCapability.Mcp
@@ -39,6 +39,11 @@ export const SHARED_NAMESPACE = ".shared";
  * A root-level item, whose namespace is empty, has nothing to join, so it keeps its bare name instead.
  */
 export const NAMESPACE_SEPARATOR = "::";
+
+/**
+ * A wildcard selection will include all current and future items from the group.
+ */
+export const NAMESPACE_WILDCARD_NAME = "*";
 
 /**
  * Lists every root-level directory a namespace can come from.
@@ -211,7 +216,7 @@ function splitCapabilityPath(
  * Joins a discovered path's namespace and name into this module's selection identifier.
  * A root match becomes its bare name, a nested one becomes its namespace and name joined by the separator.
  */
-function namespacedIdentifier(
+export function namespacedIdentifier(
     path: string,
     capability: FolderCapability,
 ): string {

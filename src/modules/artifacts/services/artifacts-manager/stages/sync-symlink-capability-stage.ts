@@ -9,6 +9,7 @@ import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
 import {
     NAMESPACE_SEPARATOR,
+    NAMESPACE_WILDCARD_NAME,
     SHARED_NAMESPACE,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import { AGENTEQ_SOURCES_ROOT } from "@support/utils/agenteq-sources-root.js";
@@ -318,8 +319,8 @@ function buildFilesFilterFor(
             return false;
         }
 
-        // No selection to filter against, every file from this source directory qualifies.
-        if (!selectedNames) {
+        // No selection to filter against, or this namespace was wildcarded, every file qualifies.
+        if (!selectedNames || selectedNames.has(NAMESPACE_WILDCARD_NAME)) {
             return true;
         }
 

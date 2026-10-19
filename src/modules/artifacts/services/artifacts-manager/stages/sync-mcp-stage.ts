@@ -10,8 +10,10 @@ import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import resolveMcpServersAction from "@artifacts/actions/resolve-mcp-servers-action.js";
 import {
+    NAMESPACE_SEPARATOR,
+    NAMESPACE_WILDCARD_NAME,
+    namespacedIdentifier,
     remoteMcpConfigFiles,
-    removeNamespace,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
@@ -91,16 +93,17 @@ async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
     for (const remote of payload.remoteSources) {
         const remoteFiles = await remoteMcpConfigFiles(remote.rootDir);
 
+        const selectedFiles = remoteFiles.filter((file) =>
+            isMcpFileSelected(file, remote.selection.mcp),
+        );
+
         const remoteServers = await resolveMcpServersAction({
             cwd: remote.rootDir,
-            files: remoteFiles,
+            files: selectedFiles,
         });
 
-        // A saved mcp selection entry can carry a namespace prefix, but a server's own key never does.
-        const selectedKeys = new Set(remote.selection.mcp.map(removeNamespace));
-
         for (const server of remoteServers) {
-            if (!selectedKeys.has(server.key) || claimedKeys.has(server.key)) {
+            if (claimedKeys.has(server.key)) {
                 continue;
             }
 
@@ -111,6 +114,24 @@ async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
     }
 
     return servers;
+}
+
+/**
+ * Reports whether a discovered mcp config file matches a remote's saved mcp selection.
+ * A namespace wildcard entry selects every server discovered under that same namespace.
+ */
+function isMcpFileSelected(file: string, selection: string[]): boolean {
+    const identifier = namespacedIdentifier(file, AgentCapability.Mcp);
+    const separatorIndex = identifier.indexOf(NAMESPACE_SEPARATOR);
+
+    if (separatorIndex === -1) {
+        return selection.includes(identifier);
+    }
+
+    const namespace = identifier.slice(0, separatorIndex);
+    const wildcardEntry = `${namespace}${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`;
+
+    return selection.includes(identifier) || selection.includes(wildcardEntry);
 }
 
 async function installMcpServers(

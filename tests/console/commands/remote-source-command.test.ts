@@ -207,6 +207,10 @@ describe("agenteq remote-source add (interactive picker)", () => {
             "(root)": [{ label: "writing-tests", value: "writing-tests" }],
             backend: [
                 {
+                    label: "* (current and future)",
+                    value: "backend::*",
+                },
+                {
                     label: "backend-example",
                     value: "backend::backend-example",
                 },
@@ -311,6 +315,10 @@ describe("agenteq remote-source add (interactive picker)", () => {
             "(root)": [{ label: "root-server", value: "root-server" }],
             backend: [
                 {
+                    label: "* (current and future)",
+                    value: "backend::*",
+                },
+                {
                     label: "backend-shared-server",
                     value: "backend::backend-shared-server",
                 },
@@ -322,6 +330,239 @@ describe("agenteq remote-source add (interactive picker)", () => {
         expect(saved.get("team")?.selection.mcp).toEqual([
             "backend::backend-shared-server",
         ]);
+
+        vi.doUnmock("@clack/prompts");
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("offers a namespace wildcard option alongside its real items, never for the root group", async () => {
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+
+        const groupMultiselectMock = vi.fn().mockResolvedValue([]);
+
+        const confirmMock = vi.fn().mockResolvedValue(false);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const originDir = await createOrigin();
+
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const rootSkillDir = join(originDir, "skills/writing-tests");
+
+        const nestedSkillDir = join(
+            originDir,
+            "backend/skills/backend-example",
+        );
+
+        await mkdir(rootSkillDir, { recursive: true });
+        await writeFile(join(rootSkillDir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(nestedSkillDir, { recursive: true });
+        await writeFile(join(nestedSkillDir, "SKILL.md"), "hello", "utf8");
+
+        runGit(originDir, ["add", "skills", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add skills"]);
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const [{ options }] = groupMultiselectMock.mock.calls[0];
+
+        expect(options["(root)"]).toEqual([
+            { label: "writing-tests", value: "writing-tests" },
+        ]);
+
+        expect(options.backend).toEqual([
+            { label: "* (current and future)", value: "backend::*" },
+            { label: "backend-example", value: "backend::backend-example" },
+        ]);
+
+        vi.doUnmock("@clack/prompts");
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("collapses a namespace down to its wildcard entry even when individual items were also checked", async () => {
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+
+        const groupMultiselectMock = vi
+            .fn()
+            .mockResolvedValue(["backend::backend-example", "backend::*"]);
+
+        const confirmMock = vi.fn().mockResolvedValue(false);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const originDir = await createOrigin();
+
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const nestedSkillDir = join(
+            originDir,
+            "backend/skills/backend-example",
+        );
+
+        await mkdir(nestedSkillDir, { recursive: true });
+        await writeFile(join(nestedSkillDir, "SKILL.md"), "hello", "utf8");
+
+        runGit(originDir, ["add", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add skill"]);
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.skills).toEqual(["backend::*"]);
+
+        vi.doUnmock("@clack/prompts");
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("seeds the wildcard plus every discovered real item when reopening a wildcarded namespace", async () => {
+        vi.resetModules();
+
+        const isTTYMock = vi.fn().mockReturnValue(true);
+        const isCIMock = vi.fn().mockReturnValue(false);
+
+        const groupMultiselectMock = vi.fn().mockResolvedValue(["backend::*"]);
+
+        const confirmMock = vi.fn().mockResolvedValue(false);
+        const isCancelMock = vi.fn().mockReturnValue(false);
+
+        vi.doMock("@clack/prompts", async (importOriginal) => {
+            const actual =
+                await importOriginal<typeof import("@clack/prompts")>();
+
+            return {
+                ...actual,
+                confirm: confirmMock,
+                groupMultiselect: groupMultiselectMock,
+                isCancel: isCancelMock,
+                isCI: isCIMock,
+                isTTY: isTTYMock,
+            };
+        });
+
+        const { registerRemoteSourceCommand: registerInteractive } =
+            await import("@console/commands/remote-source.js");
+
+        const originDir = await createOrigin();
+
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const firstSkillDir = join(originDir, "backend/skills/backend-one");
+        const secondSkillDir = join(originDir, "backend/skills/backend-two");
+
+        await mkdir(firstSkillDir, { recursive: true });
+        await writeFile(join(firstSkillDir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(secondSkillDir, { recursive: true });
+        await writeFile(join(secondSkillDir, "SKILL.md"), "hello", "utf8");
+
+        runGit(originDir, ["add", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add skills"]);
+
+        const cmd = new Command();
+
+        cmd.exitOverride();
+        registerInteractive(cmd);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--path",
+            join(cwd, "clone"),
+        ]);
+
+        groupMultiselectMock.mockClear();
+        groupMultiselectMock.mockResolvedValue(["backend::*"]);
+
+        await cmd.parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "update-choices",
+            "team",
+        ]);
+
+        const [{ initialValues }] = groupMultiselectMock.mock.calls[0];
+
+        expect(initialValues).toEqual(
+            expect.arrayContaining([
+                "backend::*",
+                "backend::backend-one",
+                "backend::backend-two",
+            ]),
+        );
 
         vi.doUnmock("@clack/prompts");
         await rm(originDir, { force: true, recursive: true });
@@ -807,6 +1048,33 @@ describe("agenteq remote-source add (scriptable selection flags)", () => {
         expect(selection?.skills).toEqual([]);
         expect(selection?.commands).toEqual([]);
         expect(selection?.mcp).toEqual([]);
+    });
+
+    it("accepts a namespace wildcard for a real namespace and skips the picker", async () => {
+        const nestedSkillDir = join(originDir, "backend/skills/skill-c");
+
+        await mkdir(nestedSkillDir, { recursive: true });
+        await writeFile(join(nestedSkillDir, "SKILL.md"), "hello", "utf8");
+
+        runGit(originDir, ["add", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add backend skill"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team2",
+            originDir,
+            "--skills",
+            "backend::*",
+            "--path",
+            join(cwd, "clone2"),
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team2")?.selection.skills).toEqual(["backend::*"]);
     });
 
     it("throws a trackable CliError when a named skill does not exist", async () => {

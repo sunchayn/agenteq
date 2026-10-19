@@ -6,7 +6,10 @@ import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync-payload.js";
-import { NAMESPACE_SEPARATOR } from "@artifacts/actions/discover-remote-capabilities-action.js";
+import {
+    NAMESPACE_SEPARATOR,
+    NAMESPACE_WILDCARD_NAME,
+} from "@artifacts/actions/discover-remote-capabilities-action.js";
 import {
     groupByNamespace,
     mirrorDir,
@@ -275,7 +278,9 @@ async function mirrorReferences(
 
         for (const [namespace, names] of byNamespace) {
             const { files } = await mirrorDir({
-                filterFiles: (file) => names.includes(file),
+                filterFiles: (file) =>
+                    names.includes(NAMESPACE_WILDCARD_NAME) ||
+                    names.includes(file),
                 isCopyMode: isCopyMode,
                 isDryRun: isDryRun,
                 sourceDir: join(
