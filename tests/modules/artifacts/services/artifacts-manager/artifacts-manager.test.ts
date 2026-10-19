@@ -1074,10 +1074,7 @@ describe("syncGuidelinesAction with a remote source", () => {
     it("reads the remote guidelines from its shared folder when the root has none", async () => {
         await rm(join(remoteRoot, "GUIDELINES.md"));
         await mkdir(join(remoteRoot, "shared"), { recursive: true });
-        await writeFile(
-            join(remoteRoot, "shared/GUIDELINES.md"),
-            "# Shared\n",
-        );
+        await writeFile(join(remoteRoot, "shared/GUIDELINES.md"), "# Shared\n");
 
         const agent = new Agent({
             ...baseAgentOptions,
@@ -1108,16 +1105,10 @@ describe("syncGuidelinesAction with a remote source", () => {
 
     it("warns and uses the root's GUIDELINES.md when both shared and common also carry one", async () => {
         await mkdir(join(remoteRoot, "shared"), { recursive: true });
-        await writeFile(
-            join(remoteRoot, "shared/GUIDELINES.md"),
-            "# Shared\n",
-        );
+        await writeFile(join(remoteRoot, "shared/GUIDELINES.md"), "# Shared\n");
 
         await mkdir(join(remoteRoot, "common"), { recursive: true });
-        await writeFile(
-            join(remoteRoot, "common/GUIDELINES.md"),
-            "# Common\n",
-        );
+        await writeFile(join(remoteRoot, "common/GUIDELINES.md"), "# Common\n");
 
         const agent = new Agent({
             ...baseAgentOptions,
@@ -1149,8 +1140,12 @@ describe("syncGuidelinesAction with a remote source", () => {
 
         expect(result.remoteSourceWarnings).toHaveLength(1);
         expect(result.remoteSourceWarnings[0]).toContain("team");
-        expect(result.remoteSourceWarnings[0]).toContain("shared/GUIDELINES.md");
-        expect(result.remoteSourceWarnings[0]).toContain("common/GUIDELINES.md");
+        expect(result.remoteSourceWarnings[0]).toContain(
+            "shared/GUIDELINES.md",
+        );
+        expect(result.remoteSourceWarnings[0]).toContain(
+            "common/GUIDELINES.md",
+        );
     });
 
     it("never mixes in the remote guidelines when they were not selected", async () => {
@@ -1724,10 +1719,7 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
             recursive: true,
         });
 
-        await writeFile(
-            join(remoteRoot, "shared/commands/foo.md"),
-            "foo body",
-        );
+        await writeFile(join(remoteRoot, "shared/commands/foo.md"), "foo body");
 
         await mkdir(join(remoteRoot, "backend/commands"), {
             recursive: true,
@@ -1830,8 +1822,12 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
 
         expect(result.remoteSourceWarnings).toHaveLength(1);
         expect(result.remoteSourceWarnings[0]).toContain("team");
-        expect(result.remoteSourceWarnings[0]).toContain("shared/commands/foo.md");
-        expect(result.remoteSourceWarnings[0]).toContain("common/commands/foo.md");
+        expect(result.remoteSourceWarnings[0]).toContain(
+            "shared/commands/foo.md",
+        );
+        expect(result.remoteSourceWarnings[0]).toContain(
+            "common/commands/foo.md",
+        );
     });
 
     it("mirrors every item in a namespace, including one never individually selected, when wildcarded", async () => {

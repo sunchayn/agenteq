@@ -34,9 +34,8 @@ vi.mock("@clack/prompts", async (importOriginal) => {
     };
 });
 
-const { attachReactiveMarkerToggle, default: input } = await import(
-    "@infrastructure/terminal/input.js"
-);
+const { attachReactiveMarkerToggle, default: input } =
+    await import("@infrastructure/terminal/input.js");
 
 describe("input.isInteractive", () => {
     it("is true for a TTY outside CI", () => {

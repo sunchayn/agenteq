@@ -86,13 +86,12 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
             join(remotesWithGuidelines[index].rootDir, "GUIDELINES.md"),
     );
 
-    const guidelinesWarnings = remotesWithGuidelines.flatMap(
-        (remote, index) =>
-            warningsForGuidelinesConflict(
-                remote.name,
-                remote.rootDir,
-                remoteGuidelinesResolutions[index],
-            ),
+    const guidelinesWarnings = remotesWithGuidelines.flatMap((remote, index) =>
+        warningsForGuidelinesConflict(
+            remote.name,
+            remote.rootDir,
+            remoteGuidelinesResolutions[index],
+        ),
     );
 
     const remoteUrls = remotesWithGuidelines.map((remote) => remote.url);
