@@ -9,6 +9,7 @@ import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync
 import {
     NAMESPACE_SEPARATOR,
     NAMESPACE_WILDCARD_NAME,
+    resolveRemoteGuidelinesPath,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import {
     groupByNamespace,
@@ -181,8 +182,12 @@ async function collectFromRemote(
     remote: ResolvedRemoteSource,
     occurrences: AnnotationOccurrence[],
 ): Promise<void> {
+    const guidelinesPath =
+        (await resolveRemoteGuidelinesPath(remote.rootDir)).path ??
+        join(remote.rootDir, "GUIDELINES.md");
+
     await addOccurrencesFrom(
-        join(remote.rootDir, "GUIDELINES.md"),
+        guidelinesPath,
         `${remote.name}/GUIDELINES.md`,
         remote.name,
         occurrences,

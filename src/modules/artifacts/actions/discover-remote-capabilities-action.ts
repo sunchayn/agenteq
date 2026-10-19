@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
 import resolveMcpServersAction from "@artifacts/actions/resolve-mcp-servers-action.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
@@ -30,9 +30,10 @@ export interface RemoteCapabilities {
 }
 
 /**
- * The folder name a remote source might carry to group root level (unamspaced) capabilities.
+ * Folder names a remote source might carry to group root level (unnamespaced) capabilities.
+ * Either or both may be present, each resolves to the root namespace.
  */
-export const SHARED_NAMESPACE = ".shared";
+export const ROOT_NAMESPACE_ALIASES = ["shared", "common"] as const;
 
 /**
  * Separator joining a nested item's namespace and name into one selection identifier.
@@ -56,10 +57,7 @@ async function namespaceCandidateDirs(rootDir: string): Promise<string[]> {
         pattern: "*",
     });
 
-    return rootDirs.filter(
-        // Dot folder are excluded, only the shared namespace (if present) is included.
-        (dir) => dir === SHARED_NAMESPACE || !dir.startsWith("."),
-    );
+    return rootDirs.filter((dir) => !dir.startsWith("."));
 }
 
 /**
@@ -96,6 +94,39 @@ function mcpConfigFilesIn(
             namespaceDirs,
         ),
     });
+}
+
+export interface RemoteGuidelinesResolution {
+    path: string | undefined;
+    /**
+     * Every other GUIDELINES.md this remote also carries, ignored in favor of `path`.
+     */
+    ignoredPaths: string[];
+}
+
+/**
+ * Resolves a remote source's GUIDELINES.md, checking its root first, then each root namespace alias folder in turn.
+ * `path` is undefined when none of them carry the file. Every path found after the first one is reported in `ignoredPaths`, for a caller to warn the user about.
+ */
+export async function resolveRemoteGuidelinesPath(
+    rootDir: string,
+): Promise<RemoteGuidelinesResolution> {
+    const candidates = [
+        join(rootDir, "GUIDELINES.md"),
+        ...ROOT_NAMESPACE_ALIASES.map((alias) =>
+            join(rootDir, alias, "GUIDELINES.md"),
+        ),
+    ];
+
+    const existing: string[] = [];
+
+    for (const candidate of candidates) {
+        if (await filesystem.exists(candidate)) {
+            existing.push(candidate);
+        }
+    }
+
+    return { ignoredPaths: existing.slice(1), path: existing[0] };
 }
 
 /**
@@ -137,7 +168,7 @@ export default async function discoverRemoteCapabilitiesAction(
         commandPaths,
         mcpConfigPaths,
         referencePaths,
-        hasGuidelines,
+        guidelinesResolution,
     ] = await Promise.all([
         filesystem.glob({
             cwd: rootDir,
@@ -170,7 +201,7 @@ export default async function discoverRemoteCapabilitiesAction(
                 namespaceDirs,
             ),
         }),
-        filesystem.exists(`${rootDir}/GUIDELINES.md`),
+        resolveRemoteGuidelinesPath(rootDir),
     ]);
 
     // Validates every mcp config already discovered above.
@@ -180,7 +211,7 @@ export default async function discoverRemoteCapabilitiesAction(
         commands: commandPaths.map((path) =>
             namespacedIdentifier(path, AgentCapability.Commands),
         ),
-        hasGuidelines: hasGuidelines,
+        hasGuidelines: guidelinesResolution.path !== undefined,
         mcp: mcpConfigPaths.map((path) =>
             namespacedIdentifier(path, AgentCapability.Mcp),
         ),
@@ -225,8 +256,12 @@ export function namespacedIdentifier(
     // An mcp path's rest is still "<name>/config.json", its real name is that file's own directory.
     const name = capability === AgentCapability.Mcp ? dirname(rest) : rest;
 
-    // The shared namespace folder resolves to the root namespace, same as a bare name.
-    const rootNamespace = namespace === SHARED_NAMESPACE ? "" : namespace;
+    // A root namespace alias folder resolves to the root namespace, same as a bare name.
+    const rootNamespace = (
+        ROOT_NAMESPACE_ALIASES as readonly string[]
+    ).includes(namespace)
+        ? ""
+        : namespace;
 
     return rootNamespace
         ? `${rootNamespace}${NAMESPACE_SEPARATOR}${name}`

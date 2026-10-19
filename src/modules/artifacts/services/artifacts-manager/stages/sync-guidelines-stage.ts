@@ -1,9 +1,13 @@
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
 import git from "@infrastructure/git.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import { guidelinesSuffix } from "@artifacts/services/artifacts-manager/stubs/guidelines-suffix.js";
+import {
+    resolveRemoteGuidelinesPath,
+    type RemoteGuidelinesResolution,
+} from "@artifacts/actions/discover-remote-capabilities-action.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 
@@ -17,9 +21,14 @@ export default async function syncGuidelinesStage(
         return payload;
     }
 
-    const { artifactPaths, rows } = await syncAgents(payload);
+    const { artifactPaths, rows, warnings } = await syncAgents(payload);
 
-    return payload.withResults(rows, artifactPaths);
+    const warnedPayload = warnings.reduce(
+        (current, warning) => current.withRemoteSourceWarning(warning),
+        payload,
+    );
+
+    return warnedPayload.withResults(rows, artifactPaths);
 }
 
 /*
@@ -40,6 +49,7 @@ interface WriteGuidelinesOptions {
 interface SyncAgentsResult {
     rows: SyncResult[];
     artifactPaths: string[];
+    warnings: string[];
 }
 
 interface WriteGuidelinesResult {
@@ -64,8 +74,25 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         (remote) => remote.selection.guidelines,
     );
 
-    const remoteSourcePaths = remotesWithGuidelines.map((remote) =>
-        join(remote.rootDir, "GUIDELINES.md"),
+    const remoteGuidelinesResolutions = await Promise.all(
+        remotesWithGuidelines.map((remote) =>
+            resolveRemoteGuidelinesPath(remote.rootDir),
+        ),
+    );
+
+    const remoteSourcePaths = remoteGuidelinesResolutions.map(
+        (resolution, index) =>
+            resolution.path ??
+            join(remotesWithGuidelines[index].rootDir, "GUIDELINES.md"),
+    );
+
+    const guidelinesWarnings = remotesWithGuidelines.flatMap(
+        (remote, index) =>
+            warningsForGuidelinesConflict(
+                remote.name,
+                remote.rootDir,
+                remoteGuidelinesResolutions[index],
+            ),
     );
 
     const remoteUrls = remotesWithGuidelines.map((remote) => remote.url);
@@ -78,7 +105,7 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         !payload.referenceAnnotationTable &&
         remoteSourcePaths.length === 0
     ) {
-        return { artifactPaths: [], rows: [] };
+        return { artifactPaths: [], rows: [], warnings: guidelinesWarnings };
     }
 
     const results: SyncResult[] = [];
@@ -128,7 +155,36 @@ async function syncAgents(payload: SyncPayload): Promise<SyncAgentsResult> {
         });
     }
 
-    return { artifactPaths: artifactPaths, rows: results };
+    return {
+        artifactPaths: artifactPaths,
+        rows: results,
+        warnings: guidelinesWarnings,
+    };
+}
+
+/**
+ * Warns when a remote carries multiple GUIDELINES.md in root and pseudo-root folders.
+ */
+function warningsForGuidelinesConflict(
+    remoteName: string,
+    rootDir: string,
+    resolution: RemoteGuidelinesResolution,
+): string[] {
+    const { ignoredPaths, path } = resolution;
+
+    if (ignoredPaths.length === 0 || !path) {
+        return [];
+    }
+
+    const usedLabel = relative(rootDir, path);
+
+    const ignoredLabels = ignoredPaths
+        .map((ignoredPath) => relative(rootDir, ignoredPath))
+        .join(", ");
+
+    return [
+        `Remote source "${remoteName}" has GUIDELINES.md in more than one place, using ${usedLabel} and ignoring ${ignoredLabels}.`,
+    ];
 }
 
 /**

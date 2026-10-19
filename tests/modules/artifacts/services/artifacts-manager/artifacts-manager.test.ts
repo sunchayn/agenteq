@@ -1071,6 +1071,88 @@ describe("syncGuidelinesAction with a remote source", () => {
         expect(content).toContain("git@example.com/team.git");
     });
 
+    it("reads the remote guidelines from its shared folder when the root has none", async () => {
+        await rm(join(remoteRoot, "GUIDELINES.md"));
+        await mkdir(join(remoteRoot, "shared"), { recursive: true });
+        await writeFile(
+            join(remoteRoot, "shared/GUIDELINES.md"),
+            "# Shared\n",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            guidelinesPath: "CLAUDE.md",
+        });
+
+        await syncGuidelinesStage(
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: true,
+                        mcp: [],
+                        references: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        const content = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+
+        expect(content).toContain("# Shared");
+    });
+
+    it("warns and uses the root's GUIDELINES.md when both shared and common also carry one", async () => {
+        await mkdir(join(remoteRoot, "shared"), { recursive: true });
+        await writeFile(
+            join(remoteRoot, "shared/GUIDELINES.md"),
+            "# Shared\n",
+        );
+
+        await mkdir(join(remoteRoot, "common"), { recursive: true });
+        await writeFile(
+            join(remoteRoot, "common/GUIDELINES.md"),
+            "# Common\n",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            guidelinesPath: "CLAUDE.md",
+        });
+
+        const result = await syncGuidelinesStage(
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: true,
+                        mcp: [],
+                        references: [],
+                        skills: [],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        const content = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+
+        expect(content).toContain("# Remote");
+        expect(content).not.toContain("# Shared");
+        expect(content).not.toContain("# Common");
+
+        expect(result.remoteSourceWarnings).toHaveLength(1);
+        expect(result.remoteSourceWarnings[0]).toContain("team");
+        expect(result.remoteSourceWarnings[0]).toContain("shared/GUIDELINES.md");
+        expect(result.remoteSourceWarnings[0]).toContain("common/GUIDELINES.md");
+    });
+
     it("never mixes in the remote guidelines when they were not selected", async () => {
         const agent = new Agent({
             ...baseAgentOptions,
@@ -1638,12 +1720,12 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
     });
 
     it("resolves a shared-namespace item as root, end to end from discovery through sync", async () => {
-        await mkdir(join(remoteRoot, ".shared/commands"), {
+        await mkdir(join(remoteRoot, "shared/commands"), {
             recursive: true,
         });
 
         await writeFile(
-            join(remoteRoot, ".shared/commands/foo.md"),
+            join(remoteRoot, "shared/commands/foo.md"),
             "foo body",
         );
 
@@ -1696,6 +1778,60 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
         expect(await readFile(join(target, "foo.md"), "utf8")).toBe("foo body");
 
         expect(await readFile(join(target, "bar.md"), "utf8")).toBe("bar body");
+    });
+
+    it("warns and keeps the shared command when shared and common both carry the same name", async () => {
+        await mkdir(join(remoteRoot, "shared/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "shared/commands/foo.md"),
+            "shared body",
+        );
+
+        await mkdir(join(remoteRoot, "common/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "common/commands/foo.md"),
+            "common body",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        const result = await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["foo.md"],
+                        guidelines: false,
+                        mcp: [],
+                        references: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        const target = join(cwd, ".test/commands");
+
+        expect(await readFile(join(target, "foo.md"), "utf8")).toBe(
+            "shared body",
+        );
+
+        expect(result.remoteSourceWarnings).toHaveLength(1);
+        expect(result.remoteSourceWarnings[0]).toContain("team");
+        expect(result.remoteSourceWarnings[0]).toContain("shared/commands/foo.md");
+        expect(result.remoteSourceWarnings[0]).toContain("common/commands/foo.md");
     });
 
     it("mirrors every item in a namespace, including one never individually selected, when wildcarded", async () => {
