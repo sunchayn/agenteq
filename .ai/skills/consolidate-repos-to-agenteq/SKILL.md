@@ -115,7 +115,7 @@ While generalizing, compare each artifact's name (skill directory name, command 
 
 Write every artifact that survived step 7 (generalized, no naming conflict) at the destination's root: `mcp/<key>/config.json`, `commands/*.md`, `skills/<name>/`, `references/<path>`. Merge guideline text into `GUIDELINES.md`. Do not nest anything under `.ai/`. Do not run `agenteq init` or `agenteq sync` in the destination. It is a remote source for other repositories, not a project syncing its own agents. No `agenteq/config.json`, no per-agent files, no gitignore entries for them.
 
-Writing at the destination's root, with no namespace folder, resolves as root capabilities, the same meaning `.shared` carries once namespace folders exist. Destination already namespaced, or this run adds one. Write under `.shared/` instead of the bare root, so root capabilities group with the namespaces instead of sitting awkwardly next to them. No namespace folders yet. Keep writing at the root.
+Writing at the destination's root, with no namespace folder, resolves as root capabilities, the same meaning `shared` or `common` carries once namespace folders exist. Destination already namespaced, or this run adds one. Write under `shared/` instead of the bare root, so root capabilities group with the namespaces instead of sitting awkwardly next to them. No namespace folders yet. Keep writing at the root.
 
 Every MCP server from every source repository always migrates to the destination. There is no option to keep an MCP server local. Skills, guidelines, commands, and references can stay local (step 10).
 

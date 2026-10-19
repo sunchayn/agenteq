@@ -10,7 +10,7 @@ import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync
 import {
     NAMESPACE_SEPARATOR,
     NAMESPACE_WILDCARD_NAME,
-    SHARED_NAMESPACE,
+    ROOT_NAMESPACE_ALIASES,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import { AGENTEQ_SOURCES_ROOT } from "@support/utils/agenteq-sources-root.js";
 import saveCopiedFilesFileAction from "@artifacts/actions/save-copied-files-file-action.js";
@@ -42,7 +42,17 @@ export default async function syncSymlinkCapabilityStage(
         });
     }
 
-    return payload.withResults(results, artifactPaths);
+    const warnings = await rootNamespaceAliasConflictWarnings(
+        capability,
+        payload,
+    );
+
+    const warnedPayload = warnings.reduce(
+        (current, warning) => current.withRemoteSourceWarning(warning),
+        payload,
+    );
+
+    return warnedPayload.withResults(results, artifactPaths);
 }
 
 /*
@@ -101,6 +111,75 @@ interface SyncOneAgentResult {
 /*
  * Internal.
  */
+
+/**
+ * Warns about every item name that shows up in more than one of a remote's root namespace alias folders.
+ * The first alias in `ROOT_NAMESPACE_ALIASES` to claim a name wins, same order the actual mirror follows.
+ */
+async function rootNamespaceAliasConflictWarnings(
+    capability: AgentCapability.Commands | AgentCapability.Skills,
+    payload: SyncPayload,
+): Promise<string[]> {
+    const warnings: string[] = [];
+
+    for (const remote of payload.remoteSources) {
+        const aliasNames = await Promise.all(
+            ROOT_NAMESPACE_ALIASES.map(async (alias) => ({
+                alias: alias,
+                names: await namesUnder(remote.rootDir, capability, alias),
+            })),
+        );
+
+        const aliasesByName = new Map<string, string[]>();
+
+        for (const { alias, names } of aliasNames) {
+            for (const name of names) {
+                aliasesByName.set(name, [
+                    ...(aliasesByName.get(name) ?? []),
+                    alias,
+                ]);
+            }
+        }
+
+        for (const [name, aliases] of aliasesByName) {
+            if (aliases.length < 2) {
+                continue;
+            }
+
+            const [usedAlias, ...ignoredAliases] = aliases;
+
+            warnings.push(
+                `Remote source "${remote.name}" has a ${capability} named "${name}" in both ${aliases.join(" and ")}, using ${usedAlias}/${capability}/${name} and ignoring ${ignoredAliases.map((alias) => `${alias}/${capability}/${name}`).join(", ")}.`,
+            );
+        }
+    }
+
+    return warnings;
+}
+
+/**
+ * Lists the top-level item names one root namespace alias folder carries for a capability.
+ */
+async function namesUnder(
+    rootDir: string,
+    capability: AgentCapability.Commands | AgentCapability.Skills,
+    alias: string,
+): Promise<Set<string>> {
+    const prefix = `${alias}/${capability}/`;
+    const isSkills = capability === AgentCapability.Skills;
+
+    const matches = await filesystem.glob({
+        cwd: rootDir,
+        dot: true,
+        onlyDirectories: isSkills || undefined,
+        onlyFiles: isSkills ? undefined : true,
+        pattern: `${prefix}${isSkills ? "*" : "**/*"}`,
+    });
+
+    return new Set(
+        matches.map((match) => topLevelName(match.slice(prefix.length))),
+    );
+}
 
 async function syncAgents(
     capability: AgentCapability.Commands | AgentCapability.Skills,
@@ -386,20 +465,17 @@ function namespaceDirsFor(
         .sort(([left], [right]) => left.localeCompare(right))
         .flatMap(([namespace, groupedSelection]) =>
             namespace === ""
-                ? // The root namespace mirrors from both the remote's own root and its shared-namespace folder.
+                ? // The root namespace mirrors from the remote's own root and from
+                  // any of its root namespace alias folders, e.g. shared or common.
                   [
                       {
                           dir: join(remote.rootDir, capability),
                           selection: groupedSelection,
                       },
-                      {
-                          dir: join(
-                              remote.rootDir,
-                              SHARED_NAMESPACE,
-                              capability,
-                          ),
+                      ...ROOT_NAMESPACE_ALIASES.map((alias) => ({
+                          dir: join(remote.rootDir, alias, capability),
                           selection: groupedSelection,
-                      },
+                      })),
                   ]
                 : [
                       {

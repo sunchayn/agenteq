@@ -150,9 +150,9 @@ Pass `--copy` (env: `AGENTEQ_COPY`) to `init` or `sync` to materialize real file
 
 Alongside your local canonical source directory, you can point Agenteq at any number of named remote git repositories, each with the same layout, `mcp/`, `commands/`, `skills/`, `GUIDELINES.md` at its root. Agenteq combines every source into one set of synced artifacts.
 
-A remote repository can also classify its skills, commands, and MCP servers under a sub-folder, e.g. `backend/skills/`, `backend/commands/`, `backend/mcp/`, alongside anything already at its root. The picker groups a classified sub-folder under its own name, so you can pick a whole group at once. `GUIDELINES.md` stays root-only, it is never picked up from a sub-folder.
+A remote repository can also classify its skills, commands, and MCP servers under a sub-folder, e.g. `backend/skills/`, `backend/commands/`, `backend/mcp/`, alongside anything already at its root. The picker groups a classified sub-folder under its own name, so you can pick a whole group at once.
 
-Once a remote repository has at least one classified sub-folder, putting its own root-level capabilities next to those sub-folders gets awkward. Use a `.shared` sub-folder for them instead, for example `.shared/skills/`, it resolves exactly like the root does. Any other dot folder, such as `.git`, is never treated as a namespace.
+Once a remote repository has at least one classified sub-folder, putting its own root-level capabilities next to those sub-folders gets awkward. Use a `shared` or `common` sub-folder for them instead, for example `shared/skills/`, it resolves exactly like the root does, including for `GUIDELINES.md`, e.g. `shared/GUIDELINES.md`.
 
 On `local <> remote` collision, local wins and on `remote <> remote` collection, whichever remote was added first wins.
 

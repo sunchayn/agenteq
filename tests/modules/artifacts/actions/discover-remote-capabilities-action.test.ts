@@ -124,6 +124,17 @@ describe("discoverRemoteCapabilitiesAction", () => {
         expect(result.hasGuidelines).toBe(true);
     });
 
+    it("reports guidelines as present when GUIDELINES.md exists under the shared folder instead of the root", async () => {
+        await mkdir(join(rootDir, "shared"), { recursive: true });
+        await writeFile(join(rootDir, "shared/GUIDELINES.md"), "# Hello");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.hasGuidelines).toBe(true);
+    });
+
     it("namespaces a skill nested under a classified sub-folder, alongside a root one", async () => {
         await mkdir(join(rootDir, "skills/writing-tests"), {
             recursive: true,
@@ -203,11 +214,11 @@ describe("discoverRemoteCapabilitiesAction", () => {
     });
 
     it("resolves a shared-namespace skill as a root item, with no namespace prefix", async () => {
-        await mkdir(join(rootDir, ".shared/skills/foo"), {
+        await mkdir(join(rootDir, "shared/skills/foo"), {
             recursive: true,
         });
 
-        await writeFile(join(rootDir, ".shared/skills/foo/SKILL.md"), "body");
+        await writeFile(join(rootDir, "shared/skills/foo/SKILL.md"), "body");
 
         const result = await discoverRemoteCapabilitiesAction({
             rootDir: rootDir,
@@ -216,12 +227,40 @@ describe("discoverRemoteCapabilitiesAction", () => {
         expect(result.skills).toEqual(["foo"]);
     });
 
-    it("keeps a shared-namespace skill distinct from a backend-namespaced one", async () => {
-        await mkdir(join(rootDir, ".shared/skills/foo"), {
+    it("resolves a common-namespace skill as a root item, with no namespace prefix", async () => {
+        await mkdir(join(rootDir, "common/skills/foo"), {
             recursive: true,
         });
 
-        await writeFile(join(rootDir, ".shared/skills/foo/SKILL.md"), "body");
+        await writeFile(join(rootDir, "common/skills/foo/SKILL.md"), "body");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.skills).toEqual(["foo"]);
+    });
+
+    it("merges shared and common namespace skills into the root namespace when both are present", async () => {
+        await mkdir(join(rootDir, "shared/skills/foo"), { recursive: true });
+        await writeFile(join(rootDir, "shared/skills/foo/SKILL.md"), "body");
+
+        await mkdir(join(rootDir, "common/skills/bar"), { recursive: true });
+        await writeFile(join(rootDir, "common/skills/bar/SKILL.md"), "body");
+
+        const result = await discoverRemoteCapabilitiesAction({
+            rootDir: rootDir,
+        });
+
+        expect(result.skills.sort()).toEqual(["bar", "foo"]);
+    });
+
+    it("keeps a shared-namespace skill distinct from a backend-namespaced one", async () => {
+        await mkdir(join(rootDir, "shared/skills/foo"), {
+            recursive: true,
+        });
+
+        await writeFile(join(rootDir, "shared/skills/foo/SKILL.md"), "body");
 
         await mkdir(join(rootDir, "backend/skills/bar"), { recursive: true });
         await writeFile(join(rootDir, "backend/skills/bar/SKILL.md"), "body");
