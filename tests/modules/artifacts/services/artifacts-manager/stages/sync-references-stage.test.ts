@@ -208,4 +208,54 @@ describe("syncReferencesStage", () => {
         expect((await lstat(target)).isSymbolicLink()).toBe(false);
         expect(await readFile(target, "utf8")).toBe("Billing terms.");
     });
+
+    it("mirrors every reference in a namespace, including one never individually selected, when wildcarded", async () => {
+        await mkdir(join(remoteRoot, "glossary/references"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "glossary/references/billing.md"),
+            "Billing terms.",
+        );
+
+        await writeFile(
+            join(remoteRoot, "glossary/references/unlisted.md"),
+            "Unlisted terms.",
+        );
+
+        const result = await syncReferencesStage(
+            payloadFor([
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: [],
+                        references: ["glossary::*"],
+                        skills: [],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        expect(result.remoteSourceWarnings).toEqual([]);
+
+        const mirroredDir = join(
+            cwd,
+            ".ai",
+            REMOTE_REFERENCES_DIR,
+            "team/glossary",
+        );
+
+        expect(await readFile(join(mirroredDir, "billing.md"), "utf8")).toBe(
+            "Billing terms.",
+        );
+
+        expect(await readFile(join(mirroredDir, "unlisted.md"), "utf8")).toBe(
+            "Unlisted terms.",
+        );
+    });
 });

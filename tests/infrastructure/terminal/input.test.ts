@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { GroupMultiSelectPrompt } from "@clack/core";
 
 const {
     confirmMock,
@@ -33,7 +34,9 @@ vi.mock("@clack/prompts", async (importOriginal) => {
     };
 });
 
-const { default: input } = await import("@infrastructure/terminal/input.js");
+const { attachReactiveMarkerToggle, default: input } = await import(
+    "@infrastructure/terminal/input.js"
+);
 
 describe("input.isInteractive", () => {
     it("is true for a TTY outside CI", () => {
@@ -170,5 +173,130 @@ describe("input.confirm", () => {
 
         await expect(input.confirm(params)).resolves.toBe(true);
         expect(confirmMock).toHaveBeenCalledWith(params);
+    });
+});
+
+describe("input.groupMultiselect with reactiveMarkers", () => {
+    it("patches and restores GroupMultiSelectPrompt.prototype.prompt around one call", async () => {
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by reference, never called detached.
+        const originalPrompt = GroupMultiSelectPrompt.prototype.prompt;
+
+        groupMultiselectMock.mockResolvedValue(["backend::*"]);
+
+        await input.groupMultiselect({
+            initialValues: [],
+            message: "Select skills to sync from this source",
+            options: {
+                backend: [
+                    { label: "foo", value: "backend::foo" },
+                    { label: "* (current and future)", value: "backend::*" },
+                ],
+            },
+            reactiveMarkers: ["backend::*"],
+        });
+
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by reference, never called detached.
+        expect(GroupMultiSelectPrompt.prototype.prompt).toBe(originalPrompt);
+    });
+
+    it("never patches the prototype when no marker is given", async () => {
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by reference, never called detached.
+        const originalPrompt = GroupMultiSelectPrompt.prototype.prompt;
+
+        groupMultiselectMock.mockResolvedValue([]);
+
+        await input.groupMultiselect({
+            initialValues: [],
+            message: "Select skills to sync from this source",
+            options: { backend: [{ label: "foo", value: "backend::foo" }] },
+        });
+
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by reference, never called detached.
+        expect(GroupMultiSelectPrompt.prototype.prompt).toBe(originalPrompt);
+    });
+});
+
+describe("attachReactiveMarkerToggle", () => {
+    function buildPrompt(initialValues: string[] = []) {
+        return new GroupMultiSelectPrompt({
+            initialValues: initialValues,
+            options: {
+                backend: [
+                    { label: "foo", value: "backend::foo" },
+                    { label: "bar", value: "backend::bar" },
+                    { label: "* (current and future)", value: "backend::*" },
+                ],
+            },
+            render: () => "",
+        });
+    }
+
+    it("selects every other item in the group once the marker is toggled on", () => {
+        const prompt = buildPrompt();
+
+        attachReactiveMarkerToggle(prompt, new Set(["backend::*"]));
+
+        prompt.cursor = prompt.options.findIndex(
+            (option) => option.value === "backend::*",
+        );
+
+        prompt.emit("cursor", "space");
+        prompt.emit("key", " ", { name: "space" });
+
+        expect(prompt.value).toEqual(
+            expect.arrayContaining([
+                "backend::*",
+                "backend::foo",
+                "backend::bar",
+            ]),
+        );
+    });
+
+    it("deselects every other item in the group once the marker is toggled off", () => {
+        const prompt = buildPrompt([
+            "backend::*",
+            "backend::foo",
+            "backend::bar",
+        ]);
+
+        attachReactiveMarkerToggle(prompt, new Set(["backend::*"]));
+
+        prompt.cursor = prompt.options.findIndex(
+            (option) => option.value === "backend::*",
+        );
+
+        prompt.emit("cursor", "space");
+        prompt.emit("key", " ", { name: "space" });
+
+        expect(prompt.value).toEqual([]);
+    });
+
+    it("leaves a non-marker row's own toggle untouched", () => {
+        const prompt = buildPrompt();
+
+        attachReactiveMarkerToggle(prompt, new Set(["backend::*"]));
+
+        prompt.cursor = prompt.options.findIndex(
+            (option) => option.value === "backend::foo",
+        );
+
+        prompt.emit("cursor", "space");
+        prompt.emit("key", " ", { name: "space" });
+
+        expect(prompt.value).toEqual(["backend::foo"]);
+    });
+
+    it("ignores a non-space key even while the cursor sits on the marker", () => {
+        const prompt = buildPrompt();
+
+        attachReactiveMarkerToggle(prompt, new Set(["backend::*"]));
+
+        prompt.cursor = prompt.options.findIndex(
+            (option) => option.value === "backend::*",
+        );
+
+        prompt.emit("key", "j", { name: "down" });
+
+        expect(prompt.value).toEqual([]);
     });
 });

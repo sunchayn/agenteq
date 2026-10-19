@@ -822,6 +822,72 @@ describe("syncMcpAction with a remote source", () => {
             "backend-remote",
         );
     });
+
+    it("installs every mcp server in a namespace, including one never individually selected, when wildcarded", async () => {
+        await mkdir(join(remoteRoot, "backend/mcp/backend-shared-server"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/mcp/backend-shared-server/config.json"),
+            JSON.stringify({
+                config: { command: "backend-remote" },
+                type: "stdio",
+            }),
+        );
+
+        await mkdir(join(remoteRoot, "backend/mcp/backend-other-server"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/mcp/backend-other-server/config.json"),
+            JSON.stringify({
+                config: { command: "backend-other-remote" },
+                type: "stdio",
+            }),
+        );
+
+        await saveRemoteSourcesFileAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            remotes: {
+                team: {
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: ["backend::*"],
+                        references: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            },
+            shouldIgnore: false,
+        });
+
+        await saveRemoteClonePathAction({
+            context: { cwd: cwd, sourceDir: ".ai" },
+            name: "team",
+            path: remoteRoot,
+        });
+
+        await artifactsManager.sync({
+            capabilities: [AgentCapability.Mcp],
+            context: { cwd: cwd, sourceDir: ".ai" },
+            selectedAgents: [mcpAgent],
+        });
+
+        const written = JSON.parse(
+            await readFile(join(cwd, ".mcp.json"), "utf8"),
+        );
+
+        expect(Object.keys(written.mcpServers).sort()).toEqual([
+            "backend-other-server",
+            "backend-shared-server",
+            "local-only",
+            "shared",
+        ]);
+    });
 });
 
 describe("syncGuidelinesAction", () => {
@@ -1630,6 +1696,57 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
         expect(await readFile(join(target, "foo.md"), "utf8")).toBe("foo body");
 
         expect(await readFile(join(target, "bar.md"), "utf8")).toBe("bar body");
+    });
+
+    it("mirrors every item in a namespace, including one never individually selected, when wildcarded", async () => {
+        await mkdir(join(remoteRoot, "backend/commands"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "backend/commands/known.md"),
+            "known",
+        );
+
+        await writeFile(
+            join(remoteRoot, "backend/commands/unlisted.md"),
+            "unlisted",
+        );
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            commandsDir: ".test/commands",
+        });
+
+        const result = await syncSymlinkCapabilityStage(
+            AgentCapability.Commands,
+            payloadFor(agent, [
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: ["backend::*"],
+                        guidelines: false,
+                        mcp: [],
+                        references: [],
+                        skills: [],
+                    },
+                    url: "git@example.com",
+                },
+            ]),
+        );
+
+        expect(result.results[0].item).toBe("3 file(s)");
+
+        const target = join(cwd, ".test/commands");
+
+        expect(await readFile(join(target, "known.md"), "utf8")).toBe(
+            "known",
+        );
+
+        expect(await readFile(join(target, "unlisted.md"), "utf8")).toBe(
+            "unlisted",
+        );
     });
 });
 

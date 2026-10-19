@@ -17,6 +17,7 @@ import loadRemoteSourcesFileAction from "@artifacts/actions/load-remote-sources-
 import saveRemoteSourcesFileAction from "@artifacts/actions/save-remote-sources-file-action.js";
 import discoverRemoteCapabilitiesAction, {
     NAMESPACE_SEPARATOR,
+    NAMESPACE_WILDCARD_NAME,
     type RemoteCapabilities,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import RemoteSourcesFile, {
@@ -795,11 +796,11 @@ function resolveExplicitSelection(
     assertItemsExist(references, capabilities.references, "reference", name);
 
     return {
-        commands: commands,
+        commands: collapseWildcardSelection(commands),
         guidelines: options.guidelines ?? false,
-        mcp: mcp,
-        references: references,
-        skills: skills,
+        mcp: collapseWildcardSelection(mcp),
+        references: collapseWildcardSelection(references),
+        skills: collapseWildcardSelection(skills),
     };
 }
 
@@ -820,6 +821,8 @@ function parseItemList(raw: string | undefined): string[] {
 
 /**
  * Throws a trackable CliError naming every requested item the remote source does not actually offer.
+ * A namespace wildcard entry is accepted once its namespace is real,
+ * even though the wildcard name itself is never a discovered item.
  */
 function assertItemsExist(
     requested: string[],
@@ -827,7 +830,27 @@ function assertItemsExist(
     itemLabel: string,
     name: string,
 ): void {
-    const unknown = requested.filter((item) => !available.includes(item));
+    const namespaces = new Set(
+        available
+            .filter((item) => item.includes(NAMESPACE_SEPARATOR))
+            .map((item) => item.slice(0, item.indexOf(NAMESPACE_SEPARATOR))),
+    );
+
+    const unknown = requested.filter((item) => {
+        if (available.includes(item)) {
+            return false;
+        }
+
+        const wildcardSuffix = `${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`;
+
+        if (item.endsWith(wildcardSuffix)) {
+            const namespace = item.slice(0, item.length - wildcardSuffix.length);
+
+            return !namespaces.has(namespace);
+        }
+
+        return true;
+    });
 
     if (unknown.length > 0) {
         throw new CliError(
@@ -843,37 +866,51 @@ async function promptForSelection(
 ): Promise<RemoteSourceSelection> {
     const skills =
         capabilities.skills.length > 0
-            ? await promptGroupMultiselect(
-                  `Select ${pc.bold("Skills")} to sync from this source`,
-                  namespacedOptions(capabilities.skills),
-                  current.skills,
+            ? collapseWildcardSelection(
+                  await promptGroupMultiselect(
+                      `Select ${pc.bold("Skills")} to sync from this source`,
+                      namespacedOptions(capabilities.skills),
+                      expandWildcardSelection(current.skills, capabilities.skills),
+                  ),
               )
             : [];
 
     const commands =
         capabilities.commands.length > 0
-            ? await promptGroupMultiselect(
-                  `Select ${pc.bold("Commands")} to sync from this source`,
-                  namespacedOptions(capabilities.commands),
-                  current.commands,
+            ? collapseWildcardSelection(
+                  await promptGroupMultiselect(
+                      `Select ${pc.bold("Commands")} to sync from this source`,
+                      namespacedOptions(capabilities.commands),
+                      expandWildcardSelection(
+                          current.commands,
+                          capabilities.commands,
+                      ),
+                  ),
               )
             : [];
 
     const mcp =
         capabilities.mcp.length > 0
-            ? await promptGroupMultiselect(
-                  `Select ${pc.bold("MCP servers")} to sync from this source`,
-                  namespacedOptions(capabilities.mcp),
-                  current.mcp,
+            ? collapseWildcardSelection(
+                  await promptGroupMultiselect(
+                      `Select ${pc.bold("MCP servers")} to sync from this source`,
+                      namespacedOptions(capabilities.mcp),
+                      expandWildcardSelection(current.mcp, capabilities.mcp),
+                  ),
               )
             : [];
 
     const references =
         capabilities.references.length > 0
-            ? await promptGroupMultiselect(
-                  `Select ${pc.bold("References")} to sync from this source`,
-                  namespacedOptions(capabilities.references),
-                  current.references,
+            ? collapseWildcardSelection(
+                  await promptGroupMultiselect(
+                      `Select ${pc.bold("References")} to sync from this source`,
+                      namespacedOptions(capabilities.references),
+                      expandWildcardSelection(
+                          current.references,
+                          capabilities.references,
+                      ),
+                  ),
               )
             : [];
 
@@ -893,6 +930,66 @@ async function promptForSelection(
     };
 }
 
+/**
+ * Expands a saved selection's wildcard entries into every discovered item under that namespace.
+ * That makes the picker render the whole group pre-checked, marker item included.
+ */
+function expandWildcardSelection(
+    selection: string[],
+    items: string[],
+): string[] {
+    const wildcardSuffix = `${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`;
+
+    const wildcardNamespaces = selection
+        .filter((entry) => entry.endsWith(wildcardSuffix))
+        .map((entry) => entry.slice(0, entry.length - wildcardSuffix.length));
+
+    if (wildcardNamespaces.length === 0) {
+        return selection;
+    }
+
+    const expandedItems = items.filter((item) =>
+        wildcardNamespaces.some((namespace) =>
+            item.startsWith(`${namespace}${NAMESPACE_SEPARATOR}`),
+        ),
+    );
+
+    return [...new Set([...selection, ...expandedItems])];
+}
+
+/**
+ * Collapses a selection list down to a namespace's wildcard entry.
+ * This happens once that literal wildcard is present, whether picked live,
+ * reactively, from the group header, or typed through a scriptable flag.
+ * Drops every individually selected item already covered by it.
+ */
+function collapseWildcardSelection(raw: string[]): string[] {
+    const wildcardSuffix = `${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`;
+
+    const wildcardNamespaces = raw
+        .filter((entry) => entry.endsWith(wildcardSuffix))
+        .map((entry) => entry.slice(0, entry.length - wildcardSuffix.length));
+
+    if (wildcardNamespaces.length === 0) {
+        return raw;
+    }
+
+    return raw.filter((entry) => {
+        const separatorIndex = entry.indexOf(NAMESPACE_SEPARATOR);
+
+        if (separatorIndex === -1) {
+            return true;
+        }
+
+        const namespace = entry.slice(0, separatorIndex);
+
+        return (
+            entry.endsWith(wildcardSuffix) ||
+            !wildcardNamespaces.includes(namespace)
+        );
+    });
+}
+
 const ROOT_GROUP_LABEL = "(root)";
 
 interface GroupableOption {
@@ -905,25 +1002,44 @@ interface GroupableOption {
  * Builds one groupable option per skill, command, or mcp server identifier.
  * Its group is the namespace encoded in that identifier.
  * A root item, with no namespace, groups under a fixed root label and keeps its bare name as its label.
+ * Every other group also gets a wildcard marker option, listed first in that group.
  */
 function namespacedOptions(items: string[]): GroupableOption[] {
-    return items.map((item) => {
+    const seenNamespaces = new Set<string>();
+    const result: GroupableOption[] = [];
+
+    for (const item of items) {
         const separatorIndex = item.indexOf(NAMESPACE_SEPARATOR);
 
-        return separatorIndex === -1
-            ? { group: ROOT_GROUP_LABEL, label: item, value: item }
-            : {
-                  group: item.slice(0, separatorIndex),
-                  label: item.slice(
-                      separatorIndex + NAMESPACE_SEPARATOR.length,
-                  ),
-                  value: item,
-              };
-    });
+        if (separatorIndex === -1) {
+            result.push({ group: ROOT_GROUP_LABEL, label: item, value: item });
+            continue;
+        }
+
+        const namespace = item.slice(0, separatorIndex);
+
+        if (!seenNamespaces.has(namespace)) {
+            seenNamespaces.add(namespace);
+            result.push({
+                group: namespace,
+                label: "* (current and future)",
+                value: `${namespace}${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`,
+            });
+        }
+
+        result.push({
+            group: namespace,
+            label: item.slice(separatorIndex + NAMESPACE_SEPARATOR.length),
+            value: item,
+        });
+    }
+
+    return result;
 }
 
 /**
  * Shows a picker grouping its options, letting the user select a whole classified sub-folder at once.
+ * Selecting a group's wildcard marker lives-selects every other item in that group too.
  */
 async function promptGroupMultiselect(
     message: string,
@@ -931,18 +1047,26 @@ async function promptGroupMultiselect(
     initialValues: string[],
 ): Promise<string[]> {
     const options: Record<string, { label: string; value: string }[]> = {};
+    const reactiveMarkers: string[] = [];
+
+    const wildcardSuffix = `${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`;
 
     for (const item of items) {
         options[item.group] = [
             ...(options[item.group] ?? []),
             { label: item.label, value: item.value },
         ];
+
+        if (item.value.endsWith(wildcardSuffix)) {
+            reactiveMarkers.push(item.value);
+        }
     }
 
     const picked = await input.groupMultiselect({
         initialValues: initialValues,
         message: message,
         options: options,
+        reactiveMarkers: reactiveMarkers,
     });
 
     if (input.isCancel(picked)) {
