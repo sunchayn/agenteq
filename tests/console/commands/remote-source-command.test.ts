@@ -1557,6 +1557,223 @@ describe("agenteq remote-source update-choices (scriptable selection flags)", ()
     });
 });
 
+describe("agenteq remote-source add-capability", () => {
+    let originDir: string;
+
+    beforeEach(async () => {
+        originDir = await createOrigin();
+        await commit(originDir, "GUIDELINES.md", "# Shared\n");
+
+        const skillADir = join(originDir, "skills/skill-a");
+        const skillBDir = join(originDir, "skills/skill-b");
+
+        const nestedSkillDir = join(
+            originDir,
+            "backend/skills/backend-example",
+        );
+
+        const commandsDir = join(originDir, "commands");
+        const mcpDir = join(originDir, "mcp/server-a");
+
+        await mkdir(skillADir, { recursive: true });
+        await writeFile(join(skillADir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(skillBDir, { recursive: true });
+        await writeFile(join(skillBDir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(nestedSkillDir, { recursive: true });
+        await writeFile(join(nestedSkillDir, "SKILL.md"), "hello", "utf8");
+
+        await mkdir(commandsDir, { recursive: true });
+        await writeFile(join(commandsDir, "cmd-a.md"), "hello", "utf8");
+
+        await mkdir(mcpDir, { recursive: true });
+        await writeFile(
+            join(mcpDir, "config.json"),
+            JSON.stringify({ config: { command: "npx" }, type: "stdio" }),
+            "utf8",
+        );
+
+        runGit(originDir, ["add", "skills", "commands", "mcp", "backend"]);
+        runGit(originDir, ["commit", "--quiet", "-m", "add capabilities"]);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add",
+            "team",
+            originDir,
+            "--skills",
+            "skill-a",
+            "--path",
+            join(cwd, "clone"),
+        ]);
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("adds the named skill to the existing selection without disturbing it", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add-capability",
+            "team",
+            "skills",
+            "skill-b",
+        ]);
+
+        const saved = await readSavedFile();
+        const selection = saved.get("team")?.selection;
+
+        expect(selection?.skills).toEqual(["skill-a", "skill-b"]);
+        expect(selection?.commands).toEqual([]);
+        expect(selection?.mcp).toEqual([]);
+    });
+
+    it("adds a command to a remote with an empty selection for that capability", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add-capability",
+            "team",
+            "commands",
+            "cmd-a.md",
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.commands).toEqual(["cmd-a.md"]);
+    });
+
+    it("adds an mcp server to the existing selection", async () => {
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add-capability",
+            "team",
+            "mcp",
+            "server-a",
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.mcp).toEqual(["server-a"]);
+    });
+
+    it("throws a trackable CliError when the remote isn't configured", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add-capability",
+                "unknown",
+                "skills",
+                "skill-b",
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_NOT_CONFIGURED" });
+    });
+
+    it("throws a trackable CliError when the capability is guidelines", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add-capability",
+                "team",
+                "guidelines",
+                "GUIDELINES.md",
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_INVALID_CAPABILITY" });
+    });
+
+    it("throws a trackable CliError when the capability name is unknown", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add-capability",
+                "team",
+                "nonsense",
+                "skill-b",
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_INVALID_CAPABILITY" });
+    });
+
+    it("throws a trackable CliError when the named item does not exist", async () => {
+        await expect(
+            program().parseAsync([
+                "node",
+                "agenteq",
+                "remote-source",
+                "add-capability",
+                "team",
+                "skills",
+                "does-not-exist",
+            ]),
+        ).rejects.toMatchObject({ code: "E_REMOTE_SOURCE_UNKNOWN_ITEM" });
+    });
+
+    it("prints a notice and leaves the selection unchanged when the item is already selected", async () => {
+        const writeSpy = vi
+            .spyOn(process.stdout, "write")
+            .mockImplementation(() => true);
+
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add-capability",
+            "team",
+            "skills",
+            "skill-a",
+            "--json",
+        ]);
+
+        const payload = JSON.parse(
+            writeSpy.mock.calls.map(([chunk]) => String(chunk)).join(""),
+        ) as { message: string };
+
+        expect(payload.message).toContain("already selected");
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.skills).toEqual(["skill-a"]);
+
+        writeSpy.mockRestore();
+    });
+
+    it("supports addressing a namespaced item with its namespace prefix", async () => {
+        // The clone is read as-is, not re-fetched,
+        // so the nested skill must already exist in the clone,
+        // added to the origin before the earlier `add` ran.
+        await program().parseAsync([
+            "node",
+            "agenteq",
+            "remote-source",
+            "add-capability",
+            "team",
+            "skills",
+            "backend::backend-example",
+        ]);
+
+        const saved = await readSavedFile();
+
+        expect(saved.get("team")?.selection.skills).toEqual([
+            "skill-a",
+            "backend::backend-example",
+        ]);
+    });
+});
+
 describe("agenteq remote-source remove", () => {
     it("prints a notice and does nothing when the named remote isn't configured", async () => {
         const writeSpy = vi

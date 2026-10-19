@@ -24,11 +24,12 @@ import RemoteSourcesFile, {
     type RemoteSourceEntry,
     type RemoteSourceSelection,
 } from "@artifacts/entities/remote-sources-file.js";
+import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { promptForClonePath } from "@console/actions/concerns/prompt-for-clone-path.js";
 import { printMessage, renderAsJson } from "@console/utils/console.js";
 
 /**
- * Registers `agenteq remote-source add/list/update-choices/remove`.
+ * Registers `agenteq remote-source add/add-capability/list/update-choices/remove`.
  * Configures any number of named remote git content sources, alongside the local canonical source directory.
  */
 export function registerRemoteSourceCommand(program: Command): void {
@@ -85,6 +86,21 @@ export function registerRemoteSourceCommand(program: Command): void {
             `canonical source directory within the current repository (env: AGENTEQ_SOURCE_DIR, default: ${artifactsManager.DEFAULT_SOURCE_DIR})`,
         )
         .action(runAdd);
+
+    remoteSourceCommand
+        .command("add-capability <name> <capability> <item>")
+        .description(
+            "Add one skill, command, or mcp server to an already configured remote source's selection, without re-running the picker",
+        )
+        .option(
+            "--json",
+            "print machine-readable JSON instead of text (env: AGENTEQ_JSON)",
+        )
+        .option(
+            "--source-dir <dir>",
+            `canonical source directory within the current repository (env: AGENTEQ_SOURCE_DIR, default: ${artifactsManager.DEFAULT_SOURCE_DIR})`,
+        )
+        .action(runAddCapability);
 
     remoteSourceCommand
         .command("list")
@@ -238,6 +254,16 @@ interface ResolveOrCloneRepoOptions {
     clonePath: string;
 }
 
+/**
+ * What `add-capability`'s `<capability>` argument resolves to.
+ * The key is shared by `RemoteCapabilities` and `RemoteSourceSelection`.
+ * The label is singular, used in error messages.
+ */
+interface PathableCapabilityField {
+    key: "skills" | "commands" | "mcp";
+    itemLabel: string;
+}
+
 /*
  * Internal.
  */
@@ -303,6 +329,68 @@ async function runAdd(
         isJson: options.isJson,
         level: "info",
         message: `Saved remote source "${pc.bold(name)}" at ${pc.bold(RemoteSourcesFile.path(context))}. Run \`npx agenteq sync\` to apply it.`,
+    });
+}
+
+/**
+ * Adds one skill, command, or mcp server to a remote source's saved selection,
+ * leaving every other previously selected item untouched and skipping the interactive picker.
+ */
+async function runAddCapability(
+    name: string,
+    capability: string,
+    item: string,
+    rawOptions: RemoteSourceOptions,
+): Promise<void> {
+    const options = resolveOptions(rawOptions);
+    const context = { cwd: process.cwd(), sourceDir: options.sourceDir };
+
+    const file = await loadRemoteSourcesFileAction({ context: context });
+    const entry = file.get(name);
+
+    assertRemoteConfigured(entry, name);
+
+    const field = parsePathableCapability(capability, name);
+
+    const agentsFile = await loadAgentsFileAction({ context: context });
+
+    const clonePath =
+        agentsFile?.clonePathOf(name) ?? defaultClonePathFor(name);
+
+    const capabilities = await discoverRemoteCapabilitiesAction({
+        rootDir: clonePath,
+    });
+
+    assertItemsExist([item], capabilities[field.key], field.itemLabel, name);
+
+    if (entry.selection[field.key].includes(item)) {
+        printMessage({
+            isJson: options.isJson,
+            level: "info",
+            message: `"${pc.bold(item)}" is already selected for "${pc.bold(name)}"'s ${field.itemLabel}s.`,
+        });
+
+        return;
+    }
+
+    const updated = file.withRemote(name, {
+        ...entry,
+        selection: {
+            ...entry.selection,
+            [field.key]: [...entry.selection[field.key], item],
+        },
+    });
+
+    await saveRemoteSourcesFileAction({
+        context: context,
+        remotes: updated.remotes,
+        shouldIgnore: false,
+    });
+
+    printMessage({
+        isJson: options.isJson,
+        level: "info",
+        message: `Added "${pc.bold(item)}" to remote source "${pc.bold(name)}"'s ${field.itemLabel}s. Run \`npx agenteq sync\` to apply it.`,
     });
 }
 
@@ -579,6 +667,36 @@ function assertRemoteConfigured(
             `No remote source named "${pc.bold(name)}" is configured. Run \`npx agenteq remote-source add ${name} <git-url>\` first.`,
         );
     }
+}
+
+/**
+ * A capability `add-capability` can address by a single item name.
+ * Guidelines is excluded. It syncs as one whole-source toggle, not a list of addressable items.
+ */
+const PATHABLE_CAPABILITIES: Partial<Record<string, PathableCapabilityField>> =
+    {
+        [AgentCapability.Commands]: { itemLabel: "command", key: "commands" },
+        [AgentCapability.Mcp]: { itemLabel: "mcp server", key: "mcp" },
+        [AgentCapability.Skills]: { itemLabel: "skill", key: "skills" },
+    };
+
+/**
+ * Validates `add-capability`'s `<capability>` argument against the capabilities it can address by item.
+ */
+function parsePathableCapability(
+    raw: string,
+    name: string,
+): PathableCapabilityField {
+    const field = PATHABLE_CAPABILITIES[raw];
+
+    if (!field) {
+        throw new CliError(
+            "E_REMOTE_SOURCE_INVALID_CAPABILITY",
+            `"${pc.bold(raw)}" is not a capability addressable by item. Use one of mcp, commands, skills. Guidelines syncs as a whole, toggle it with \`npx agenteq remote-source update-choices ${name} --guidelines\`.`,
+        );
+    }
+
+    return field;
 }
 
 /**
