@@ -1143,6 +1143,7 @@ describe("syncGuidelinesAction with a remote source", () => {
         expect(result.remoteSourceWarnings[0]).toContain(
             "shared/GUIDELINES.md",
         );
+
         expect(result.remoteSourceWarnings[0]).toContain(
             "common/GUIDELINES.md",
         );
@@ -1825,6 +1826,7 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
         expect(result.remoteSourceWarnings[0]).toContain(
             "shared/commands/foo.md",
         );
+
         expect(result.remoteSourceWarnings[0]).toContain(
             "common/commands/foo.md",
         );
