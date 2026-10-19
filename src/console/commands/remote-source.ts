@@ -844,7 +844,10 @@ function assertItemsExist(
         const wildcardSuffix = `${NAMESPACE_SEPARATOR}${NAMESPACE_WILDCARD_NAME}`;
 
         if (item.endsWith(wildcardSuffix)) {
-            const namespace = item.slice(0, item.length - wildcardSuffix.length);
+            const namespace = item.slice(
+                0,
+                item.length - wildcardSuffix.length,
+            );
 
             return !namespaces.has(namespace);
         }
@@ -870,7 +873,10 @@ async function promptForSelection(
                   await promptGroupMultiselect(
                       `Select ${pc.bold("Skills")} to sync from this source`,
                       namespacedOptions(capabilities.skills),
-                      expandWildcardSelection(current.skills, capabilities.skills),
+                      expandWildcardSelection(
+                          current.skills,
+                          capabilities.skills,
+                      ),
                   ),
               )
             : [];

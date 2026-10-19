@@ -1703,10 +1703,7 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
             recursive: true,
         });
 
-        await writeFile(
-            join(remoteRoot, "backend/commands/known.md"),
-            "known",
-        );
+        await writeFile(join(remoteRoot, "backend/commands/known.md"), "known");
 
         await writeFile(
             join(remoteRoot, "backend/commands/unlisted.md"),
@@ -1740,9 +1737,7 @@ describe("syncSymlinkCapabilityAction with a remote source", () => {
 
         const target = join(cwd, ".test/commands");
 
-        expect(await readFile(join(target, "known.md"), "utf8")).toBe(
-            "known",
-        );
+        expect(await readFile(join(target, "known.md"), "utf8")).toBe("known");
 
         expect(await readFile(join(target, "unlisted.md"), "utf8")).toBe(
             "unlisted",
