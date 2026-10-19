@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0](https://github.com/sunchayn/agenteq/compare/v1.4.0...v1.5.0) (2026-10-19)
+
+### Added
+
+- **artifacts:** add `copy` mode as a symlink alternative ([#51](https://github.com/sunchayn/agenteq/issues/51)) ([14be6d3](https://github.com/sunchayn/agenteq/commit/14be6d3e6364cba4c03d50bce9240bc32726b150))
+- **artifacts:** add `references` capability ([#54](https://github.com/sunchayn/agenteq/issues/54)) ([c83ba08](https://github.com/sunchayn/agenteq/commit/c83ba08096e5b197cc32886577a1d884c442b546))
+- **artifacts:** add scriptable selection flags to remote-source ([#48](https://github.com/sunchayn/agenteq/issues/48)) ([60fa959](https://github.com/sunchayn/agenteq/commit/60fa959b5120d093e0dd9b7a6825abca994b4429))
+- **artifacts:** allow pinning a remote source ([#41](https://github.com/sunchayn/agenteq/issues/41)) ([ecc2492](https://github.com/sunchayn/agenteq/commit/ecc2492d3780dc77bb191895c3917995a34ae50e))
+- **artifacts:** allow selecting future items from remote ([#59](https://github.com/sunchayn/agenteq/issues/59)) ([1694407](https://github.com/sunchayn/agenteq/commit/169440741d6c1c546c4a7022e9a9a4c16f126a72))
+- **artifacts:** discover artifacts in remote sub-folders ([#40](https://github.com/sunchayn/agenteq/issues/40)) ([228038b](https://github.com/sunchayn/agenteq/commit/228038be1aa1030822baa0240a05bb634a9a9c72))
+- **artifacts:** shared namespace for root-level capabilities ([#52](https://github.com/sunchayn/agenteq/issues/52)) ([e733a3d](https://github.com/sunchayn/agenteq/commit/e733a3d8c66a0d68e19e20c3b5b015b57fd3971f))
+- **console:** add --dry-run to sync and init ([#47](https://github.com/sunchayn/agenteq/issues/47)) ([4c0725b](https://github.com/sunchayn/agenteq/commit/4c0725b30afb4a4ed7e69abb70f4981ba645b2a8))
+
+### Fixed
+
+- **artifacts:** detect hand-edited artifacts before sync overwrites them ([#43](https://github.com/sunchayn/agenteq/issues/43)) ([06052d8](https://github.com/sunchayn/agenteq/commit/06052d8b5731b10e509ff81e505246d516d73d36))
+- **artifacts:** respect copy mode when mirroring references ([#55](https://github.com/sunchayn/agenteq/issues/55)) ([7e1e93d](https://github.com/sunchayn/agenteq/commit/7e1e93dec9a37750c5c66db2837ee5e00b432a9b))
+- **artifacts:** skip placeholder reference annotations silently ([#58](https://github.com/sunchayn/agenteq/issues/58)) ([45d99ae](https://github.com/sunchayn/agenteq/commit/45d99aebb12b8bf69ec62e7d984923fb1990456c))
+- track remote local clone in the manifest instead ([#37](https://github.com/sunchayn/agenteq/issues/37)) ([fc1ee7e](https://github.com/sunchayn/agenteq/commit/fc1ee7e7a3de92808e9f45cc0b08de8bf0c95ba1))
+
 ## [1.4.0](https://github.com/sunchayn/agenteq/compare/v1.3.0...v1.4.0) (2026-09-16)
 
 ### Added
