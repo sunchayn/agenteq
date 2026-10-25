@@ -1071,6 +1071,38 @@ describe("syncGuidelinesAction with a remote source", () => {
         expect(content).toContain("git@example.com/team.git");
     });
 
+    it("collapses the blank lines left by an empty local file, a remote block, and a Boost block", async () => {
+        await writeFile(join(cwd, ".ai", "GUIDELINES.md"), "");
+
+        const agent = new Agent({
+            ...baseAgentOptions,
+            guidelinesPath: "CLAUDE.md",
+        });
+
+        const payload = payloadFor(agent, [
+            {
+                name: "team",
+                rootDir: remoteRoot,
+                selection: {
+                    commands: [],
+                    guidelines: true,
+                    mcp: [],
+                    references: [],
+                    skills: [],
+                },
+                url: "git@example.com/team.git",
+            },
+        ]).withBoostGuidelines("Use Pest for tests.");
+
+        await syncGuidelinesStage(payload);
+
+        const content = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+
+        expect(content).not.toMatch(/\n{3,}/);
+        expect(content).toContain("# Remote");
+        expect(content).toContain("Use Pest for tests.");
+    });
+
     it("reads the remote guidelines from its shared folder when the root has none", async () => {
         await rm(join(remoteRoot, "GUIDELINES.md"));
         await mkdir(join(remoteRoot, "shared"), { recursive: true });
