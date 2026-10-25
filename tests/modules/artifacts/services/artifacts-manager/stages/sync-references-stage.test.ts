@@ -258,4 +258,98 @@ describe("syncReferencesStage", () => {
             "Unlisted terms.",
         );
     });
+
+    it("resolves a bare annotation from a remote's shared alias folder", async () => {
+        await mkdir(join(remoteRoot, "shared/references"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "shared/references/glossary.md"),
+            "Billing terms.",
+        );
+
+        await mkdir(join(remoteRoot, "skills/billing"), { recursive: true });
+        await writeFile(
+            join(remoteRoot, "skills/billing/SKILL.md"),
+            "See @reference(glossary.md) for terms.",
+        );
+
+        const result = await syncReferencesStage(
+            payloadFor([
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: [],
+                        references: [],
+                        skills: ["billing"],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        expect(result.remoteSourceWarnings).toEqual([]);
+
+        const mirrored = await readFile(
+            join(cwd, ".ai", REMOTE_REFERENCES_DIR, "team/glossary.md"),
+            "utf8",
+        );
+
+        expect(mirrored).toBe("Billing terms.");
+    });
+
+    it("skips an annotation from a remote skill that was not selected", async () => {
+        await mkdir(join(remoteRoot, "glossary/references"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "glossary/references/billing.md"),
+            "Billing terms.",
+        );
+
+        await mkdir(join(remoteRoot, "skills/unselected"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "skills/unselected/SKILL.md"),
+            "See @reference(team:glossary::billing.md) for terms.",
+        );
+
+        const result = await syncReferencesStage(
+            payloadFor([
+                {
+                    name: "team",
+                    rootDir: remoteRoot,
+                    selection: {
+                        commands: [],
+                        guidelines: false,
+                        mcp: [],
+                        references: [],
+                        skills: ["other"],
+                    },
+                    url: "git@example.com/team.git",
+                },
+            ]),
+        );
+
+        expect(result.referenceAnnotationTable).toBeUndefined();
+
+        await expect(
+            readFile(
+                join(
+                    cwd,
+                    ".ai",
+                    REMOTE_REFERENCES_DIR,
+                    "team/glossary/billing.md",
+                ),
+                "utf8",
+            ),
+        ).rejects.toThrow();
+    });
 });
