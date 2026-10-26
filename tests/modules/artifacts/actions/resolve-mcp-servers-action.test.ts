@@ -93,4 +93,47 @@ describe("resolveMcpServersAction", () => {
 
         expect(servers.map((server) => server.key)).toEqual(["example"]);
     });
+
+    it("normalizes a single envFile path into a one-item list", async () => {
+        await writeConfig("example", {
+            config: { command: "npx", envFile: ".env" },
+            type: "stdio",
+        });
+
+        const [server] = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/example/config.json"],
+        });
+
+        expect(server.envFile).toEqual([".env"]);
+        expect(server.extra).toBeUndefined();
+    });
+
+    it("keeps an envFile list as given", async () => {
+        await writeConfig("example", {
+            config: { command: "npx", envFile: [".env", ".env.local"] },
+            type: "stdio",
+        });
+
+        const [server] = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/example/config.json"],
+        });
+
+        expect(server.envFile).toEqual([".env", ".env.local"]);
+    });
+
+    it("leaves envFile undefined when the config has none", async () => {
+        await writeConfig("example", {
+            config: { command: "npx" },
+            type: "stdio",
+        });
+
+        const [server] = await resolveMcpServersAction({
+            cwd: cwd,
+            files: [".ai/mcp/example/config.json"],
+        });
+
+        expect(server.envFile).toBeUndefined();
+    });
 });

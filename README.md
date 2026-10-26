@@ -323,6 +323,8 @@ If a command fails, the error message starts with a code in parentheses, for exa
 | `E_REMOTE_SOURCE_TAG_NOT_FOUND`      | The tag given to `--pin` or `remote-source pin` does not exist on that remote.                                                                                                                                           |
 | `E_REMOTE_SOURCE_CHECKOUT_FAILED`    | `remote-source pin` could not check out the resolved tag, see the printed detail for the underlying git error.                                                                                                           |
 | `E_REMOTE_SOURCE_NO_DEFAULT_BRANCH`  | `remote-source unpin` could not determine the remote's default branch from its clone.                                                                                                                                    |
+| `E_MISSING_MCP_EXEC_COMMAND`         | `mcp exec` was run with no command after `--`. Pass the real server command there.                                                                                                                                       |
+| `E_MISSING_MCP_ENV_VAR`              | `mcp exec` could not resolve a `${VAR}` it needed, in neither the process environment nor any `--env-file`. The message names the var and the files it checked.                                                          |
 
 ### MCP config
 
@@ -342,16 +344,40 @@ Each `.ai/mcp/<name>/config.json` file describes one MCP server. Its `<name>` di
 }
 ```
 
-| `type`  | `config` fields                            |
-| ------- | ------------------------------------------ |
-| `stdio` | `command` (required), `args`, `env`, `cwd` |
-| `http`  | `url` (required), `headers`                |
-| `sse`   | `url` (required), `headers`                |
+| `type`  | `config` fields                                       |
+| ------- | ----------------------------------------------------- |
+| `stdio` | `command` (required), `args`, `env`, `cwd`, `envFile` |
+| `http`  | `url` (required), `headers`, `envFile`                |
+| `sse`   | `url` (required), `headers`, `envFile`                |
 
 Any other field you place under `config` is not rejected. It is copied directly into the file each agent writes, so agent-specific or future MCP options work without needing a schema update.
 
 > [!IMPORTANT]
 > Junie has no native `http`/`sse` support, so agenteq rewrites those entries into a stdio call to `mcp-remote` instead. `headers` and any other `config` fields are dropped in that conversion.
+
+#### Resolving secrets from an env file
+
+A `${VAR}` placeholder in `env` or `headers`, like `"Bearer ${TOKEN}"` above, is never resolved at sync time. It stays in the agent's own config file exactly as written, so the secret itself never gets committed.
+
+Set `envFile` to a path, or a list of paths, holding the real values.
+
+```json
+{
+    "type": "http",
+    "config": {
+        "url": "https://example.com/mcp",
+        "headers": { "Authorization": "Bearer ${TOKEN}" },
+        "envFile": ".env"
+    }
+}
+```
+
+With `envFile` set, agenteq wraps the server's own command behind `agenteq mcp exec --env-file <path> -- <realCommand>`. The agent still spawns the server itself, forwarding its unresolved `env`/`headers` as that child process's own environment. `mcp exec` is what actually runs at that point, and it resolves every `${VAR}` it finds, in this order:
+
+1. A real value already set in the process environment, for example one the agent itself resolved.
+2. The first `--env-file` (in the order given) that defines it.
+
+If neither has it, `mcp exec` fails fast with `E_MISSING_MCP_ENV_VAR`, naming the var and every file it checked, instead of handing the real server a literal `${TOKEN}` string. You will not normally run `mcp exec` yourself, agenteq's own sync writes it into the config for you.
 
 ## Configuration
 

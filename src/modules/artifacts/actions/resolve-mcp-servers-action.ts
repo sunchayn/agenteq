@@ -122,18 +122,33 @@ function toMcpServer(
             command: parsed.config.command,
             cwd: parsed.config.cwd,
             env: parsed.config.env,
+            envFile: normalizeEnvFile(parsed.config.envFile),
             extra: extractExtra(parsed.config, STDIO_FIELDS),
             key: key,
         });
     }
 
     return new McpRemoteServer({
+        envFile: normalizeEnvFile(parsed.config.envFile),
         extra: extractExtra(parsed.config, REMOTE_FIELDS),
         headers: parsed.config.headers,
         key: key,
         type: parsed.type,
         url: parsed.config.url,
     });
+}
+
+/**
+ * Normalizes a canonical config's envFile, a single path or a list, into a list.
+ */
+function normalizeEnvFile(
+    envFile: string | string[] | undefined,
+): string[] | undefined {
+    if (!envFile) {
+        return undefined;
+    }
+
+    return Array.isArray(envFile) ? envFile : [envFile];
 }
 
 function extractExtra(

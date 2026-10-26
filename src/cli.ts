@@ -6,6 +6,7 @@ import { registerDetectCommand } from "@console/commands/detect.js";
 import { registerInitCommand } from "@console/commands/init.js";
 import { registerSyncCommand } from "@console/commands/sync.js";
 import { registerRemoteSourceCommand } from "@console/commands/remote-source.js";
+import { registerMcpCommand } from "@console/commands/mcp.js";
 import { CliError } from "@support/errors/cli-error.js";
 
 const pkg = JSON.parse(
@@ -40,6 +41,7 @@ registerDetectCommand(program);
 registerInitCommand(program);
 registerSyncCommand(program);
 registerRemoteSourceCommand(program);
+registerMcpCommand(program);
 
 program.parseAsync().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);

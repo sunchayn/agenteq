@@ -80,4 +80,31 @@ describe("mcpSchema", () => {
 
         expect(result.success).toBe(false);
     });
+
+    it("accepts a stdio config with a single envFile path", () => {
+        const result = mcpSchema.safeParse({
+            config: { command: "npx", envFile: ".env" },
+            type: "stdio",
+        });
+
+        expect(result.success).toBe(true);
+    });
+
+    it("accepts a stdio config with an envFile list", () => {
+        const result = mcpSchema.safeParse({
+            config: { command: "npx", envFile: [".env", ".env.local"] },
+            type: "stdio",
+        });
+
+        expect(result.success).toBe(true);
+    });
+
+    it("accepts an http config with an envFile list", () => {
+        const result = mcpSchema.safeParse({
+            config: { envFile: [".env"], url: "https://example.com/mcp" },
+            type: "http",
+        });
+
+        expect(result.success).toBe(true);
+    });
 });
