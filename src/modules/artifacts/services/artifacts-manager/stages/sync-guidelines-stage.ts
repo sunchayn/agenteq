@@ -225,7 +225,11 @@ async function writeGuidelines(
             ? `\n\n<laravel-boost-guidelines>\n${boostGuidelines}\n\n</laravel-boost-guidelines>\n`
             : "";
 
-        const content = `${remoteBlock}${raw}${boostBlock}${referenceAnnotationTable ?? ""}${guidelinesSuffix({ remoteUrls: remoteUrls })}`;
+        const rawContent = `${remoteBlock}${raw}${boostBlock}${referenceAnnotationTable ?? ""}${guidelinesSuffix({ remoteUrls: remoteUrls })}`;
+
+        // Boost's own writer collapses 3+ newlines to one blank line on every run.
+        // Matching that here keeps our hash stable across a later Boost update.
+        const content = rawContent.replace(/\n{3,}/g, "\n\n");
 
         if (!isDryRun) {
             await filesystem.mkdir(dirname(target));
