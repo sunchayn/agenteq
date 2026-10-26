@@ -615,6 +615,222 @@ describe("artifactsManager.sync", () => {
 
         expect(gitignore).toContain(".claude/skills");
     });
+
+    it("syncs remote skills for a Boost-targeted agent, leaving its local skills alone", async () => {
+        await writeFile(
+            join(cwd, "boost.json"),
+            JSON.stringify({
+                agents: ["claude_code"],
+                skills: ["placeholder"],
+            }),
+        );
+
+        await mkdir(join(cwd, ".ai/skills/local-skill"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/skills/local-skill/SKILL.md"),
+            "local content",
+        );
+
+        const remoteRoot = await mkdtemp(
+            join(tmpdir(), "agenteq-boost-remote-"),
+        );
+
+        await mkdir(join(remoteRoot, "skills/remote-skill"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "skills/remote-skill/SKILL.md"),
+            "remote content",
+        );
+
+        const claudeCodeAgent = new Agent({
+            ...baseAgentOptions,
+            name: "claude_code",
+            skillsDir: ".claude-code-test/skills",
+        });
+
+        try {
+            await syncSymlinkCapabilityStage(
+                AgentCapability.Skills,
+                new SyncPayload({
+                    capabilities: [AgentCapability.Skills],
+                    context: { cwd: cwd, sourceDir: ".ai" },
+                    remoteSources: [
+                        {
+                            name: "team",
+                            rootDir: remoteRoot,
+                            selection: {
+                                commands: [],
+                                guidelines: false,
+                                mcp: [],
+                                references: [],
+                                skills: ["remote-skill"],
+                            },
+                            url: "git@example.com/team.git",
+                        },
+                    ],
+                    selectedAgents: [claudeCodeAgent],
+                }),
+            );
+
+            expect(
+                await filesystem.exists(
+                    join(cwd, ".claude-code-test/skills/local-skill"),
+                ),
+            ).toBe(false);
+
+            expect(
+                await filesystem.exists(
+                    join(cwd, ".claude-code-test/skills/remote-skill"),
+                ),
+            ).toBe(true);
+        } finally {
+            await rm(remoteRoot, { force: true, recursive: true });
+        }
+    });
+
+    it("still syncs local skills normally for an agent Boost does not target", async () => {
+        await writeFile(
+            join(cwd, "boost.json"),
+            JSON.stringify({
+                agents: ["claude_code"],
+                skills: ["placeholder"],
+            }),
+        );
+
+        await mkdir(join(cwd, ".ai/skills/local-skill"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/skills/local-skill/SKILL.md"),
+            "local content",
+        );
+
+        const remoteRoot = await mkdtemp(
+            join(tmpdir(), "agenteq-boost-remote-"),
+        );
+
+        await mkdir(join(remoteRoot, "skills/remote-skill"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "skills/remote-skill/SKILL.md"),
+            "remote content",
+        );
+
+        const junieAgent = new Agent({
+            ...baseAgentOptions,
+            name: "junie",
+            skillsDir: ".junie-test/skills",
+        });
+
+        try {
+            await syncSymlinkCapabilityStage(
+                AgentCapability.Skills,
+                new SyncPayload({
+                    capabilities: [AgentCapability.Skills],
+                    context: { cwd: cwd, sourceDir: ".ai" },
+                    remoteSources: [
+                        {
+                            name: "team",
+                            rootDir: remoteRoot,
+                            selection: {
+                                commands: [],
+                                guidelines: false,
+                                mcp: [],
+                                references: [],
+                                skills: ["remote-skill"],
+                            },
+                            url: "git@example.com/team.git",
+                        },
+                    ],
+                    selectedAgents: [junieAgent],
+                }),
+            );
+
+            expect(
+                await filesystem.exists(
+                    join(cwd, ".junie-test/skills/local-skill"),
+                ),
+            ).toBe(true);
+
+            expect(
+                await filesystem.exists(
+                    join(cwd, ".junie-test/skills/remote-skill"),
+                ),
+            ).toBe(true);
+        } finally {
+            await rm(remoteRoot, { force: true, recursive: true });
+        }
+    });
+
+    it("skips a remote skill for a Boost-targeted agent when its name clashes with a local skill", async () => {
+        await writeFile(
+            join(cwd, "boost.json"),
+            JSON.stringify({
+                agents: ["claude_code"],
+                skills: ["placeholder"],
+            }),
+        );
+
+        await mkdir(join(cwd, ".ai/skills/shared-name"), { recursive: true });
+        await writeFile(
+            join(cwd, ".ai/skills/shared-name/SKILL.md"),
+            "local content",
+        );
+
+        const remoteRoot = await mkdtemp(
+            join(tmpdir(), "agenteq-boost-remote-"),
+        );
+
+        await mkdir(join(remoteRoot, "skills/shared-name"), {
+            recursive: true,
+        });
+
+        await writeFile(
+            join(remoteRoot, "skills/shared-name/SKILL.md"),
+            "remote content",
+        );
+
+        const claudeCodeAgent = new Agent({
+            ...baseAgentOptions,
+            name: "claude_code",
+            skillsDir: ".claude-code-test/skills",
+        });
+
+        try {
+            await syncSymlinkCapabilityStage(
+                AgentCapability.Skills,
+                new SyncPayload({
+                    capabilities: [AgentCapability.Skills],
+                    context: { cwd: cwd, sourceDir: ".ai" },
+                    remoteSources: [
+                        {
+                            name: "team",
+                            rootDir: remoteRoot,
+                            selection: {
+                                commands: [],
+                                guidelines: false,
+                                mcp: [],
+                                references: [],
+                                skills: ["shared-name"],
+                            },
+                            url: "git@example.com/team.git",
+                        },
+                    ],
+                    selectedAgents: [claudeCodeAgent],
+                }),
+            );
+
+            expect(
+                await filesystem.exists(
+                    join(cwd, ".claude-code-test/skills/shared-name"),
+                ),
+            ).toBe(false);
+        } finally {
+            await rm(remoteRoot, { force: true, recursive: true });
+        }
+    });
 });
 
 describe("syncMcpAction with a remote source", () => {
