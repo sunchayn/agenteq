@@ -33,6 +33,7 @@ export function registerStatusCommand(program: Command): void {
         )
         .action(async (rawOptions: StatusOptions) => {
             const options = resolveOptions(rawOptions);
+
             const context = {
                 cwd: process.cwd(),
                 sourceDir: options.sourceDir,
