@@ -282,6 +282,29 @@ describe("git.fetchTags / git.listTags / git.checkoutTag / git.currentTag", () =
     });
 });
 
+describe("git.currentCommit", () => {
+    it("returns HEAD's short hash after cloning", async () => {
+        const originDir = await mkdtemp(
+            join(tmpdir(), "agenteq-git-commit-origin-"),
+        );
+
+        const targetDir = join(cwd, "clone");
+
+        initRepo(originDir);
+        await commitFile(originDir, "GUIDELINES.md", "hello");
+
+        await git.clone({ targetDir: targetDir, url: originDir });
+
+        expect(git.currentCommit({ cwd: targetDir })).toMatch(/^[0-9a-f]+$/);
+
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("returns undefined outside a git working tree", () => {
+        expect(git.currentCommit({ cwd: cwd })).toBeUndefined();
+    });
+});
+
 describe("git.defaultBranch / git.checkoutBranch", () => {
     let originDir: string;
     let targetDir: string;

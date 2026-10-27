@@ -65,6 +65,7 @@ The following commands are available.
 npx agenteq detect
 npx agenteq init
 npx agenteq sync
+npx agenteq status
 ```
 
 ### agenteq detect
@@ -100,6 +101,19 @@ The first time you run it, with nothing configured, it behaves like `agenteq ini
 > You can add `agenteq sync` to a git hook, running it whenever changes to the canonical source directory (`.ai` by default) are detected.
 
 The `sync` command also takes `--update-pins` (env: `AGENTEQ_UPDATE_PINS`), which re-pins every pinned remote source to its newest release before syncing. See [pinning a remote source to a release](#pinning-a-remote-source-to-a-release).
+
+### agenteq status
+
+Shows the current sync state without touching anything: the configured agents, every remote source with its pin and the commit its clone is at, which artifacts were edited by hand since the last sync, and which generated artifacts ended up tracked by git.
+
+```bash
+npx agenteq status
+```
+
+| Flag                  | What it does                                                             |
+| --------------------- | -------------------------------------------------------------------------- |
+| `--json`              | Print the result as JSON instead of text, so a script or CI step can read it. |
+| `--source-dir <dir>`  | The canonical source directory to read from. Defaults to `.ai`.          |
 
 ### Options shared by `init` and `sync`
 
