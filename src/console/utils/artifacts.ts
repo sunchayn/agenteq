@@ -1,5 +1,4 @@
 import loadAgentsFileAction from "@agents/actions/load-agents-file-action.js";
-import resolveBoostSkillsEnabledAction from "@agents/actions/resolve-boost-skills-enabled-action.js";
 import { CliError } from "@support/errors/cli-error.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import type { RunContext } from "@shared/types/run-context.js";
@@ -8,9 +7,7 @@ import type { RunContext } from "@shared/types/run-context.js";
  * Resolves which capabilities to sync, use the following order.
  *     1. from --only
  *     2. then the saved agents file
- *     3. then a default of all*
- *
- * *It excludes Skills when Laravel Boost already manages skills for this project.
+ *     3. then a default of all
  *
  * Also reports whether the result needs to be persisted back to the saved agents file.
  */
@@ -38,19 +35,7 @@ export async function resolveCapabilitiesToSync(
     }
 
     // No flag and nothing saved, so this default is freshly established and needs saving.
-    const defaultCapabilities = parseCapabilities(undefined);
-
-    const boostManagesSkills = await resolveBoostSkillsEnabledAction({
-        context: context,
-    });
-
-    const capabilities = boostManagesSkills
-        ? defaultCapabilities.filter(
-              (capability) => capability !== AgentCapability.Skills,
-          )
-        : defaultCapabilities;
-
-    return { capabilities: capabilities, isDirty: true };
+    return { capabilities: parseCapabilities(undefined), isDirty: true };
 }
 
 /**

@@ -2,6 +2,9 @@ import { dirname, join, relative } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
 import git from "@infrastructure/git.js";
 import type Agent from "@agents/entities/agent.js";
+import resolveBoostAgentsAction from "@agents/actions/resolve-boost-agents-action.js";
+import resolveBoostSkillsEnabledAction from "@agents/actions/resolve-boost-skills-enabled-action.js";
+import type { RunContext } from "@shared/types/run-context.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import type { SyncResult } from "@artifacts/types/sync-result.js";
@@ -99,6 +102,7 @@ interface SyncOneAgentOptions {
     sourceDirs: SourceDir[];
     targetRelDir: string;
     isDryRun?: boolean;
+    preClaimedNames?: ReadonlySet<string>;
 }
 
 interface SyncOneAgentResult {
@@ -181,11 +185,76 @@ async function namesUnder(
     );
 }
 
+/**
+ * Lists the top-level item names a directory carries for a capability,
+ * skills by directory, commands by file and a missing directory reports no names.
+ */
+async function topLevelNamesIn(
+    dir: string | undefined,
+    capability: AgentCapability.Commands | AgentCapability.Skills,
+): Promise<Set<string>> {
+    if (!dir || !(await filesystem.exists(dir))) {
+        return new Set();
+    }
+
+    const isSkills = capability === AgentCapability.Skills;
+
+    const matches = await filesystem.glob({
+        cwd: dir,
+        dot: true,
+        onlyDirectories: isSkills || undefined,
+        onlyFiles: isSkills ? undefined : true,
+        pattern: isSkills ? "*" : "**/*",
+    });
+
+    return new Set(matches.map(topLevelName));
+}
+
+/**
+ * Resolves the agent names Laravel Boost targets, when Boost manages local skills.
+ * Boost owns .ai/skills for those agents, so their local source dir is skipped,
+ * remote skills still sync for them.
+ */
+async function boostManagedSkillAgentNames(
+    capability: AgentCapability.Commands | AgentCapability.Skills,
+    context: RunContext,
+): Promise<Set<string>> {
+    if (capability !== AgentCapability.Skills) {
+        return new Set();
+    }
+
+    const fileContent = await filesystem.readFile(
+        join(context.cwd, "boost.json"),
+    );
+
+    if (!fileContent) {
+        return new Set();
+    }
+
+    const [boostManagesSkills, boostAgents] = await Promise.all([
+        resolveBoostSkillsEnabledAction({
+            context: context,
+            fileContent: fileContent,
+        }),
+        resolveBoostAgentsAction({
+            context: context,
+            fileContent: fileContent,
+        }),
+    ]);
+
+    if (!boostManagesSkills || !boostAgents) {
+        return new Set();
+    }
+
+    return new Set(boostAgents.map((agent) => agent.name));
+}
+
 async function syncAgents(
     capability: AgentCapability.Commands | AgentCapability.Skills,
     payload: SyncPayload,
 ): Promise<SyncAgentsResult> {
     const sourceDirs = sourceDirsFor(capability, payload);
+    const remoteOnlySourceDirs = remoteSourceDirsFor(capability, payload);
     const { isDryRun } = payload.context;
     const { isCopyMode } = payload;
 
@@ -210,6 +279,18 @@ async function syncAgents(
         };
     }
 
+    const boostManagedAgentNames = await boostManagedSkillAgentNames(
+        capability,
+        payload.context,
+    );
+
+    // Boost already owns local .ai/skills for its own targeted agents,
+    // so its top-level names still block a same-named remote skill from landing there.
+    const localSkillNames =
+        boostManagedAgentNames.size > 0
+            ? await topLevelNamesIn(sourceDirs[0]?.dir, capability)
+            : new Set<string>();
+
     const results: SyncResult[] = [];
     const artifactPaths: string[] = [];
     const copiedFilePaths: string[] = [];
@@ -229,6 +310,8 @@ async function syncAgents(
             continue;
         }
 
+        const isBoostManagedForAgent = boostManagedAgentNames.has(agent.name);
+
         const {
             copiedFilePaths: agentCopiedFilePaths,
             fileCount,
@@ -240,7 +323,12 @@ async function syncAgents(
             cwd: payload.context.cwd,
             isCopyMode: isCopyMode,
             isDryRun: isDryRun,
-            sourceDirs: sourceDirs,
+            preClaimedNames: isBoostManagedForAgent
+                ? localSkillNames
+                : undefined,
+            sourceDirs: isBoostManagedForAgent
+                ? remoteOnlySourceDirs
+                : sourceDirs,
             targetRelDir: targetRelDir,
         });
 
@@ -300,6 +388,7 @@ async function syncOneAgent(
         cwd,
         isCopyMode,
         isDryRun,
+        preClaimedNames,
         sourceDirs,
         targetRelDir,
     } = options;
@@ -317,7 +406,7 @@ async function syncOneAgent(
     try {
         // Earlier directories win a same-name collision over every later one, the local source,
         // always listed first, wins over every remote, then each remote wins over every later one.
-        const claimedNames = new Set<string>();
+        const claimedNames = new Set<string>(preClaimedNames);
 
         let fileCount = 0;
         const copiedFilePaths: string[] = [];
