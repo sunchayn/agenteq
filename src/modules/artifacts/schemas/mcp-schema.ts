@@ -7,17 +7,22 @@ const base = z.object({
     $schema: z.string().optional(),
 });
 
+// A path, or paths, read at runtime to resolve ${VAR} placeholders.
+const envFile = z.union([z.string(), z.array(z.string())]).optional();
+
 export const stdioConfig = z.looseObject({
     args: z.array(z.string()).optional(),
     command: z.string(),
     cwd: z.string().optional(),
     env: z.record(z.string(), z.string()).optional(),
+    envFile: envFile,
 });
 
 // The .looseObject keeps command, url, and similar fields typed for editors while still accepting unknown agent
 // or vendor-specific fields, such as a future timeout option.
 // Unknown fields flow through to McpEntry.extra.
 export const remoteConfig = z.looseObject({
+    envFile: envFile,
     headers: z.record(z.string(), z.string()).optional(),
     url: z.url(),
 });

@@ -9,6 +9,8 @@ import { AgentCapability } from "@artifacts/enums/agent-capability.js";
 import { ConfigFileFormat } from "@artifacts/enums/config-file-format.js";
 import { SyncStatus } from "@artifacts/enums/sync-status.js";
 import resolveMcpServersAction from "@artifacts/actions/resolve-mcp-servers-action.js";
+import wrapMcpServerWithEnvFileRunnerAction from "@artifacts/actions/wrap-mcp-server-with-env-file-runner-action.js";
+import { agenteqPackageVersion } from "@support/utils/agenteq-package-version.js";
 import {
     NAMESPACE_SEPARATOR,
     NAMESPACE_WILDCARD_NAME,
@@ -113,7 +115,14 @@ async function collectMcpServers(payload: SyncPayload): Promise<McpServer[]> {
         }
     }
 
-    return servers;
+    const version = agenteqPackageVersion();
+
+    return servers.map((server) =>
+        wrapMcpServerWithEnvFileRunnerAction({
+            server: server,
+            version: version,
+        }),
+    );
 }
 
 /**

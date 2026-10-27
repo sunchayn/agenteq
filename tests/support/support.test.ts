@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CliError } from "@support/errors/cli-error.js";
 import { expandPath } from "@support/utils/expand-path.js";
 import { shellEscape } from "@support/utils/shell-escape.js";
+import { parseDotenv } from "@support/utils/parse-dotenv.js";
+import { expandEnvPlaceholders } from "@support/utils/expand-env-placeholders.js";
 
 describe("CliError", () => {
     it("prefixes the message with a trackable code", () => {
@@ -103,5 +105,61 @@ describe("shellEscape", () => {
         it("doubles embedded double quotes", () => {
             expect(shellEscape('say "hi"')).toBe('"say ""hi"""');
         });
+    });
+});
+
+describe("parseDotenv", () => {
+    it("parses KEY=VALUE lines into a flat map", () => {
+        expect(parseDotenv("FOO=bar\nBAZ=qux")).toEqual({
+            BAZ: "qux",
+            FOO: "bar",
+        });
+    });
+
+    it("skips blank lines, comment lines, and lines with no =", () => {
+        expect(parseDotenv("# a comment\n\nFOO=bar\nNOTANASSIGNMENT")).toEqual({
+            FOO: "bar",
+        });
+    });
+
+    it("strips matching surrounding quotes from a value", () => {
+        expect(parseDotenv(`FOO="bar"\nBAZ='qux'`)).toEqual({
+            BAZ: "qux",
+            FOO: "bar",
+        });
+    });
+
+    it("trims whitespace around the key and the value", () => {
+        expect(parseDotenv("  FOO  =  bar  ")).toEqual({ FOO: "bar" });
+    });
+});
+
+describe("expandEnvPlaceholders", () => {
+    it("replaces every ${VAR} occurrence using the resolver", () => {
+        const result = expandEnvPlaceholders("${A}-${B}", (name) =>
+            name === "A" ? "1" : "2",
+        );
+
+        expect(result).toEqual({ missing: [], value: "1-2" });
+    });
+
+    it("leaves an unresolved placeholder as-is and reports its name", () => {
+        const result = expandEnvPlaceholders("${A}-${B}", (name) =>
+            name === "A" ? "1" : undefined,
+        );
+
+        expect(result).toEqual({ missing: ["B"], value: "1-${B}" });
+    });
+
+    it("deduplicates a missing name repeated across placeholders", () => {
+        const result = expandEnvPlaceholders("${A}-${A}", () => undefined);
+
+        expect(result).toEqual({ missing: ["A"], value: "${A}-${A}" });
+    });
+
+    it("leaves a string with no placeholder untouched", () => {
+        const result = expandEnvPlaceholders("plain text", () => "unused");
+
+        expect(result).toEqual({ missing: [], value: "plain text" });
     });
 });

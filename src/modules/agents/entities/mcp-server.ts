@@ -8,11 +8,17 @@ export abstract class McpServer {
 
     readonly extra?: Record<string, unknown>;
 
+    /**
+     * Paths agenteq reads at runtime to resolve this server's ${VAR} placeholders.
+     */
+    readonly envFile?: string[];
+
     abstract readonly type: "stdio" | "http" | "sse";
 
     protected constructor(options: McpServerOptions) {
         this.key = options.key;
         this.extra = options.extra;
+        this.envFile = options.envFile;
     }
 
     abstract toAgentEntry(mappers: McpServerMappers): Record<string, unknown>;
@@ -72,6 +78,7 @@ export interface McpServerOptions {
      * Any other field present in the canonical config that agenteq does not recognize.
      */
     readonly extra?: Record<string, unknown>;
+    readonly envFile?: string[];
 }
 
 export interface McpStdioServerOptions extends McpServerOptions {
