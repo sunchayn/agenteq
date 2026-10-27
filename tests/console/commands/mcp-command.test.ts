@@ -1,9 +1,16 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { registerMcpCommand } from "@console/commands/mcp.js";
 import { createProgram } from "./command-test-helpers.js";
+
+const execFileAsync = promisify(execFile);
+
+const builtCliPath = new URL("../../../dist/cli.js", import.meta.url)
+    .pathname;
 
 let cwd: string;
 let outputFile: string;
@@ -48,7 +55,7 @@ describe("agenteq mcp exec", () => {
             "agenteq",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             join(cwd, ".env"),
             "--",
             ...writeVarScript("AGENTEQ_TEST_VAR"),
@@ -68,7 +75,7 @@ describe("agenteq mcp exec", () => {
             "agenteq",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             join(cwd, ".env"),
             "--",
             ...writeVarScript("AGENTEQ_TEST_VAR"),
@@ -79,7 +86,7 @@ describe("agenteq mcp exec", () => {
         );
     });
 
-    it("lets an earlier --env-file win a key collision over a later one", async () => {
+    it("lets an earlier --dotenv win a key collision over a later one", async () => {
         await writeFile(join(cwd, "a.env"), "AGENTEQ_TEST_VAR=from-a\n");
         await writeFile(join(cwd, "b.env"), "AGENTEQ_TEST_VAR=from-b\n");
         process.env.AGENTEQ_TEST_VAR = "${AGENTEQ_TEST_VAR}";
@@ -91,9 +98,9 @@ describe("agenteq mcp exec", () => {
             "agenteq",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             join(cwd, "a.env"),
-            "--env-file",
+            "--dotenv",
             join(cwd, "b.env"),
             "--",
             ...writeVarScript("AGENTEQ_TEST_VAR"),
@@ -102,7 +109,7 @@ describe("agenteq mcp exec", () => {
         await expect(readFile(outputFile, "utf8")).resolves.toBe("from-a");
     });
 
-    it("silently ignores a missing --env-file path", async () => {
+    it("silently ignores a missing --dotenv path", async () => {
         process.env.AGENTEQ_TEST_VAR = "from-process";
 
         const program = createProgram(registerMcpCommand);
@@ -112,7 +119,7 @@ describe("agenteq mcp exec", () => {
             "agenteq",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             join(cwd, "does-not-exist.env"),
             "--",
             ...writeVarScript("AGENTEQ_TEST_VAR"),
@@ -134,7 +141,7 @@ describe("agenteq mcp exec", () => {
                 "agenteq",
                 "mcp",
                 "exec",
-                "--env-file",
+                "--dotenv",
                 join(cwd, ".env"),
                 "--",
                 process.execPath,
@@ -156,7 +163,7 @@ describe("agenteq mcp exec", () => {
             "agenteq",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             join(cwd, ".env"),
             "--",
             process.execPath,
@@ -185,5 +192,23 @@ describe("agenteq mcp exec", () => {
 
         expect(process.exitCode).toBe(7);
         process.exitCode = 0;
+    });
+});
+
+describe("agenteq mcp exec, run through the built CLI", () => {
+    it("skips a missing --dotenv path and resolves the key from the environment", async () => {
+        const { stdout } = await execFileAsync(process.execPath, [
+            builtCliPath,
+            "mcp",
+            "exec",
+            "--dotenv",
+            join(cwd, "missing.env"),
+            "--",
+            process.execPath,
+            "-e",
+            "process.stdout.write(process.env.AGENTEQ_TEST_VAR ?? '')",
+        ], { env: { ...process.env, AGENTEQ_TEST_VAR: "from-process" } });
+
+        expect(stdout).toBe("from-process");
     });
 });

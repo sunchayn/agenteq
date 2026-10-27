@@ -43,7 +43,7 @@ describe("wrapMcpServerWithEnvFileRunnerAction", () => {
             "agenteq@1.0.0",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             ".env",
             "--",
             "npx",
@@ -55,7 +55,7 @@ describe("wrapMcpServerWithEnvFileRunnerAction", () => {
         expect(stdio.env).toEqual({ TOKEN: "${TOKEN}" });
     });
 
-    it("adds a --env-file flag per path, in order, for multiple env files", () => {
+    it("adds a --dotenv flag per path, in order, for multiple env files", () => {
         const server = new McpStdioServer({
             command: "npx",
             envFile: [".env", ".env.local"],
@@ -72,9 +72,9 @@ describe("wrapMcpServerWithEnvFileRunnerAction", () => {
             "agenteq@1.0.0",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             ".env",
-            "--env-file",
+            "--dotenv",
             ".env.local",
             "--",
             "npx",
@@ -105,7 +105,7 @@ describe("wrapMcpServerWithEnvFileRunnerAction", () => {
             "agenteq@1.0.0",
             "mcp",
             "exec",
-            "--env-file",
+            "--dotenv",
             ".env",
             "--",
             "npx",
