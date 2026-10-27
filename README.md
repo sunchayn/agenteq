@@ -110,10 +110,10 @@ Shows the current sync state without touching anything: the configured agents, e
 npx agenteq status
 ```
 
-| Flag                  | What it does                                                             |
-| --------------------- | -------------------------------------------------------------------------- |
-| `--json`              | Print the result as JSON instead of text, so a script or CI step can read it. |
-| `--source-dir <dir>`  | The canonical source directory to read from. Defaults to `.ai`.          |
+| Flag                 | What it does                                                                  |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `--json`             | Print the result as JSON instead of text, so a script or CI step can read it. |
+| `--source-dir <dir>` | The canonical source directory to read from. Defaults to `.ai`.               |
 
 ### Options shared by `init` and `sync`
 
