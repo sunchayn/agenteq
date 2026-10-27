@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
 import git from "@infrastructure/git.js";
 import { AgentCapability } from "@artifacts/enums/agent-capability.js";
@@ -9,6 +9,7 @@ import type { ResolvedRemoteSource } from "@artifacts/data-transfer-objects/sync
 import {
     NAMESPACE_SEPARATOR,
     NAMESPACE_WILDCARD_NAME,
+    ROOT_NAMESPACE_ALIASES,
     resolveRemoteGuidelinesPath,
 } from "@artifacts/actions/discover-remote-capabilities-action.js";
 import {
@@ -193,19 +194,55 @@ async function collectFromRemote(
         occurrences,
     );
 
-    const skillFiles = await filesystem.glob({
-        cwd: remote.rootDir,
-        onlyFiles: true,
-        pattern: "**/skills/**/*.md",
-    });
+    // Only scan the namespaces the user actually selected, instead of the whole remote.
+    // A remote can hold skills the user never chose, and those must never leak a reference.
+    const selectionByNamespace = groupByNamespace(remote.selection.skills);
 
-    for (const file of skillFiles) {
-        await addOccurrencesFrom(
-            join(remote.rootDir, file),
-            `${remote.name}/${file}`,
-            remote.name,
-            occurrences,
-        );
+    for (const [namespace, names] of selectionByNamespace) {
+        // The root namespace can also live under an alias folder, like shared or common.
+        // A named namespace only ever has one real location, so it gets a single dir.
+        const skillsDirs =
+            namespace === ""
+                ? [
+                      join(remote.rootDir, "skills"),
+                      ...ROOT_NAMESPACE_ALIASES.map((alias) =>
+                          join(remote.rootDir, alias, "skills"),
+                      ),
+                  ]
+                : [join(remote.rootDir, namespace, "skills")];
+
+        for (const skillsDir of skillsDirs) {
+            const skillFiles = await filesystem.glob({
+                cwd: skillsDir,
+                onlyFiles: true,
+                pattern: "**/*.md",
+            });
+
+            for (const file of skillFiles) {
+                // A skill is a directory of files, so its top-level segment is its name.
+                // That name is what the saved selection actually lists, not the file path.
+                const skillName = file.split("/")[0];
+
+                // A skill outside this namespace's selection is skipped right here.
+                // This keeps an unselected skill's references out of the mirrored set,
+                // instead of mirroring them first and discarding them later.
+                if (
+                    !names.includes(NAMESPACE_WILDCARD_NAME) &&
+                    !names.includes(skillName)
+                ) {
+                    continue;
+                }
+
+                const absolutePath = join(skillsDir, file);
+
+                await addOccurrencesFrom(
+                    absolutePath,
+                    `${remote.name}/${relative(remote.rootDir, absolutePath)}`,
+                    remote.name,
+                    occurrences,
+                );
+            }
+        }
     }
 }
 
@@ -282,27 +319,36 @@ async function mirrorReferences(
         const byNamespace = groupByNamespace([...selection]);
 
         for (const [namespace, names] of byNamespace) {
-            const { files } = await mirrorDir({
-                filterFiles: (file) =>
-                    names.includes(NAMESPACE_WILDCARD_NAME) ||
-                    names.includes(file),
-                isCopyMode: isCopyMode,
-                isDryRun: isDryRun,
-                sourceDir: join(
-                    remote.rootDir,
-                    namespace,
-                    AgentCapability.References,
-                ),
-                targetDir: join(
-                    cwd,
-                    sourceDir,
-                    REMOTE_REFERENCES_DIR,
-                    remote.name,
-                    namespace,
-                ),
-            });
+            // The root namespace also mirrors from its alias folders, e.g. shared or common.
+            const namespaceDirs =
+                namespace === ""
+                    ? [
+                          remote.rootDir,
+                          ...ROOT_NAMESPACE_ALIASES.map((alias) =>
+                              join(remote.rootDir, alias),
+                          ),
+                      ]
+                    : [join(remote.rootDir, namespace)];
 
-            fileCount += files.length;
+            for (const namespaceDir of namespaceDirs) {
+                const { files } = await mirrorDir({
+                    filterFiles: (file) =>
+                        names.includes(NAMESPACE_WILDCARD_NAME) ||
+                        names.includes(file),
+                    isCopyMode: isCopyMode,
+                    isDryRun: isDryRun,
+                    sourceDir: join(namespaceDir, AgentCapability.References),
+                    targetDir: join(
+                        cwd,
+                        sourceDir,
+                        REMOTE_REFERENCES_DIR,
+                        remote.name,
+                        namespace,
+                    ),
+                });
+
+                fileCount += files.length;
+            }
         }
     }
 
