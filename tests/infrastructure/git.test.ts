@@ -349,6 +349,54 @@ describe("git protocol retry", () => {
         expect(result.isSuccessful).toBe(false);
         expect(result.detail).not.toMatch(/https:\/\/|git@/);
     });
+
+    it("pulls real commits through an insteadOf-rewritten scp-like retry url, against a local bare repository", async () => {
+        const bareDir = join(cwd, "bare.git");
+
+        runGit(cwd, ["clone", "--quiet", "--bare", originDir, bareDir]);
+        await git.clone({ targetDir: targetDir, url: bareDir });
+
+        // The https origin targets a closed loopback port, so the first attempt fails fast with no real network dependency.
+        // The extra slash before bareDir keeps its own leading slash in the retry's scp-like path, so that url stays absolute.
+        runGit(targetDir, [
+            "remote",
+            "set-url",
+            "origin",
+            `https://127.0.0.1/${bareDir}`,
+        ]);
+
+        await commitFile(originDir, "retried.md", "it worked");
+        runGit(originDir, ["push", "--quiet", bareDir, "HEAD"]);
+
+        const sshWrapper = join(cwd, "fake-ssh.sh");
+
+        await writeFile(
+            sshWrapper,
+            '#!/bin/bash\neval "${@: -1}"\n',
+            "utf8",
+        );
+
+        spawnSync("chmod", ["+x", sshWrapper]);
+
+        const previousSshCommand = process.env.GIT_SSH_COMMAND;
+
+        process.env.GIT_SSH_COMMAND = sshWrapper;
+
+        try {
+            const result = await git.pull({ cwd: targetDir });
+
+            expect(result.isSuccessful).toBe(true);
+            expect(
+                await readFile(join(targetDir, "retried.md"), "utf8"),
+            ).toBe("it worked");
+        } finally {
+            if (previousSshCommand === undefined) {
+                delete process.env.GIT_SSH_COMMAND;
+            } else {
+                process.env.GIT_SSH_COMMAND = previousSshCommand;
+            }
+        }
+    });
 });
 
 describe("git.currentCommit", () => {
