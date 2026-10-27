@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.6.2](https://github.com/sunchayn/agenteq/compare/v1.6.1...v1.6.2) (2026-10-27)
 
-
 ### Fixed
 
-* **artifacts:** skip hand-edit check for Boost-generated guideline files ([#75](https://github.com/sunchayn/agenteq/issues/75)) ([a035b1e](https://github.com/sunchayn/agenteq/commit/a035b1e03ffc0f3cc5d13a3c73592490458612dc))
+- **artifacts:** skip hand-edit check for Boost-generated guideline files ([#75](https://github.com/sunchayn/agenteq/issues/75)) ([a035b1e](https://github.com/sunchayn/agenteq/commit/a035b1e03ffc0f3cc5d13a3c73592490458612dc))
 
 ## [1.6.1](https://github.com/sunchayn/agenteq/compare/v1.6.0...v1.6.1) (2026-10-27)
 
