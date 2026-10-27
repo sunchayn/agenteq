@@ -148,7 +148,12 @@ async function clone(options: CloneOptions): Promise<GitCommandResult> {
     }
 
     return {
-        detail: combineFailureDetail(url, result.detail, retryUrl, retryResult.detail),
+        detail: combineFailureDetail(
+            url,
+            result.detail,
+            retryUrl,
+            retryResult.detail,
+        ),
         isSuccessful: false,
     };
 }
