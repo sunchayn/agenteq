@@ -135,12 +135,13 @@ async function clone(options: CloneOptions): Promise<GitCommandResult> {
         return result;
     }
 
-    const retryUrl = alternateProtocolUrl(url);
+    const rewrite = protocolRewrite(url);
 
-    if (!retryUrl) {
+    if (!rewrite) {
         return result;
     }
 
+    const { retryUrl } = rewrite;
     const retryResult = await runGitAsync(["clone", "--", retryUrl, targetDir]);
 
     if (retryResult.isSuccessful) {
@@ -278,26 +279,47 @@ async function checkoutBranch(
 }
 
 /**
- * Converts an SSH remote url to its HTTPS form, or an HTTPS one to its SSH form.
- * Returns undefined for a url that is neither, such as a local filesystem path, there is no other protocol to retry with.
+ * Describes a remote url's other protocol, SSH vs HTTPS.
+ * Returns the full retry url, plus the two host-level base prefixes that feed `url.<base>.insteadOf` for a one-command rewrite.
+ * Returns undefined for a url that is neither SSH nor HTTPS, such as a local filesystem path.
  */
-function alternateProtocolUrl(url: string): string | undefined {
+function protocolRewrite(
+    url: string,
+): { originBase: string; retryBase: string; retryUrl: string } | undefined {
     const scpLike = /^git@([^:]+):(.+)$/.exec(url);
 
     if (scpLike) {
-        return `https://${scpLike[1]}/${scpLike[2]}`;
+        const [, host, path] = scpLike;
+
+        return {
+            originBase: `git@${host}:`,
+            retryBase: `https://${host}/`,
+            retryUrl: `https://${host}/${path}`,
+        };
     }
 
     const sshUri = /^ssh:\/\/git@([^/]+)\/(.+)$/.exec(url);
 
     if (sshUri) {
-        return `https://${sshUri[1]}/${sshUri[2]}`;
+        const [, host, path] = sshUri;
+
+        return {
+            originBase: `ssh://git@${host}/`,
+            retryBase: `https://${host}/`,
+            retryUrl: `https://${host}/${path}`,
+        };
     }
 
     const https = /^https:\/\/([^/]+)\/(.+)$/.exec(url);
 
     if (https) {
-        return `git@${https[1]}:${https[2]}`;
+        const [, host, path] = https;
+
+        return {
+            originBase: `https://${host}/`,
+            retryBase: `git@${host}:`,
+            retryUrl: `git@${host}:${path}`,
+        };
     }
 
     return undefined;
@@ -330,14 +352,16 @@ async function runWithOriginRetry(
     }
 
     const currentUrl = remoteUrl({ cwd: cwd });
-    const retryUrl = currentUrl ? alternateProtocolUrl(currentUrl) : undefined;
+    const rewrite = currentUrl ? protocolRewrite(currentUrl) : undefined;
 
-    if (!currentUrl || !retryUrl) {
+    if (!currentUrl || !rewrite) {
         return result;
     }
 
+    const { originBase, retryBase, retryUrl } = rewrite;
+
     const retryResult = await runGitAsync(
-        ["-c", `remote.origin.url=${retryUrl}`, ...args],
+        ["-c", `url.${retryBase}.insteadOf=${originBase}`, ...args],
         cwd,
     );
 
