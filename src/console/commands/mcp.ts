@@ -20,7 +20,7 @@ export function registerMcpCommand(program: Command): void {
             "Resolve ${VAR} placeholders from an env file, then exec the real MCP server.",
         )
         .option(
-            "--env-file <path>",
+            "--dotenv <path>",
             "env file to read, repeatable, earlier files win a same-key collision",
             collectEnvFiles,
             [],
@@ -29,7 +29,7 @@ export function registerMcpCommand(program: Command): void {
         .action(async (commandArgs: string[], options: ExecOptions) => {
             const exitCode = await execMcpServer({
                 command: commandArgs,
-                envFiles: options.envFile,
+                envFiles: options.dotenv,
             });
 
             process.exitCode = exitCode;
@@ -41,7 +41,7 @@ export function registerMcpCommand(program: Command): void {
  */
 
 interface ExecOptions {
-    envFile: string[];
+    dotenv: string[];
 }
 
 interface ExecMcpServerOptions {
@@ -109,7 +109,7 @@ async function execMcpServer(options: ExecMcpServerOptions): Promise<number> {
     if (missing.size > 0) {
         throw new CliError(
             "E_MISSING_MCP_ENV_VAR",
-            `Missing value(s) for ${[...missing].join(", ")}. Checked the process environment and: ${envFiles.join(", ") || "(no --env-file given)"}.`,
+            `Missing value(s) for ${[...missing].join(", ")}. Checked the process environment and: ${envFiles.join(", ") || "(no --dotenv given)"}.`,
         );
     }
 

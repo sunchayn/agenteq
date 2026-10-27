@@ -18,12 +18,13 @@ export default function wrapMcpServerWithEnvFileRunnerAction(
         return server;
     }
 
+    // --dotenv, not --env-file, since Node 20.6+ intercepts --env-file itself.
     const runnerPrefix = [
         "-y",
         `agenteq@${version}`,
         "mcp",
         "exec",
-        ...server.envFile.flatMap((path) => ["--env-file", path]),
+        ...server.envFile.flatMap((path) => ["--dotenv", path]),
         "--",
     ];
 
