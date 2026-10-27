@@ -282,6 +282,75 @@ describe("git.fetchTags / git.listTags / git.checkoutTag / git.currentTag", () =
     });
 });
 
+describe("git protocol retry", () => {
+    let originDir: string;
+    let targetDir: string;
+
+    beforeEach(async () => {
+        originDir = await mkdtemp(join(tmpdir(), "agenteq-git-retry-origin-"));
+        targetDir = join(cwd, "clone");
+        initRepo(originDir);
+        await commitFile(originDir, "GUIDELINES.md", "hello");
+    });
+
+    afterEach(async () => {
+        await rm(originDir, { force: true, recursive: true });
+    });
+
+    it("retries a clone's ssh:// url over https when both fail, naming both urls", async () => {
+        const result = await git.clone({
+            targetDir: targetDir,
+            url: "ssh://git@127.0.0.1:1/owner/repo.git",
+        });
+
+        expect(result.isSuccessful).toBe(false);
+        expect(result.detail).toContain("ssh://git@127.0.0.1:1/owner/repo.git");
+        expect(result.detail).toContain("https://127.0.0.1:1/owner/repo.git");
+    });
+
+    it("retries a pull's scp-like origin over https when both fail, naming both urls", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+        runGit(targetDir, [
+            "remote",
+            "set-url",
+            "origin",
+            "git@127.0.0.1:owner/repo.git",
+        ]);
+
+        const result = await git.pull({ cwd: targetDir });
+
+        expect(result.isSuccessful).toBe(false);
+        expect(result.detail).toContain("git@127.0.0.1:owner/repo.git");
+        expect(result.detail).toContain("https://127.0.0.1/owner/repo.git");
+    });
+
+    it("retries a tag fetch's https origin over ssh when both fail, naming both urls", async () => {
+        await git.clone({ targetDir: targetDir, url: originDir });
+        runGit(targetDir, [
+            "remote",
+            "set-url",
+            "origin",
+            "https://127.0.0.1/owner/repo.git",
+        ]);
+
+        const result = await git.fetchTags({ cwd: targetDir });
+
+        expect(result.isSuccessful).toBe(false);
+        expect(result.detail).toContain("https://127.0.0.1/owner/repo.git");
+        expect(result.detail).toContain("git@127.0.0.1:owner/repo.git");
+    });
+
+    it("does not retry a local path, it is neither ssh nor https", async () => {
+        const result = await git.clone({
+            targetDir: targetDir,
+            url: join(tmpdir(), "agenteq-does-not-exist"),
+        });
+
+        expect(result.isSuccessful).toBe(false);
+        expect(result.detail).not.toMatch(/https:\/\/|git@/);
+    });
+});
+
 describe("git.currentCommit", () => {
     it("returns HEAD's short hash after cloning", async () => {
         const originDir = await mkdtemp(

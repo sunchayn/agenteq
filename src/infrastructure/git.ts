@@ -123,20 +123,44 @@ async function ignore(options: IgnoreOptions): Promise<void> {
 
 /**
  * Clones a repository into targetDir.
+ * On failure, retries once with the url's other protocol (SSH vs HTTPS), for a machine that can only reach the host over that one.
+ * A clone that succeeds with the retry url keeps that url as its origin, same as a plain clone would.
  */
 async function clone(options: CloneOptions): Promise<GitCommandResult> {
     const { targetDir, url } = options;
 
-    return runGitAsync(["clone", "--", url, targetDir]);
+    const result = await runGitAsync(["clone", "--", url, targetDir]);
+
+    if (result.isSuccessful) {
+        return result;
+    }
+
+    const retryUrl = alternateProtocolUrl(url);
+
+    if (!retryUrl) {
+        return result;
+    }
+
+    const retryResult = await runGitAsync(["clone", "--", retryUrl, targetDir]);
+
+    if (retryResult.isSuccessful) {
+        return retryResult;
+    }
+
+    return {
+        detail: combineFailureDetail(url, result.detail, retryUrl, retryResult.detail),
+        isSuccessful: false,
+    };
 }
 
 /**
  * Fast-forward-only pulls an existing clone.
+ * On failure, retries once against the origin's other protocol, without changing the clone's own origin config.
  */
 async function pull(options: PullOptions): Promise<GitCommandResult> {
     const { cwd } = options;
 
-    return runGitAsync(["pull", "--ff-only"], cwd);
+    return runWithOriginRetry(cwd, ["pull", "--ff-only"]);
 }
 
 /**
@@ -155,11 +179,12 @@ function remoteUrl(options: RemoteUrlOptions): string | undefined {
 
 /**
  * Fetches every tag from origin.
+ * On failure, retries once against the origin's other protocol, without changing the clone's own origin config.
  */
 async function fetchTags(options: FetchTagsOptions): Promise<GitCommandResult> {
     const { cwd } = options;
 
-    return runGitAsync(["fetch", "--tags", "--force"], cwd);
+    return runWithOriginRetry(cwd, ["fetch", "--tags", "--force"]);
 }
 
 /**
@@ -248,11 +273,98 @@ async function checkoutBranch(
 }
 
 /**
+ * Converts an SSH remote url to its HTTPS form, or an HTTPS one to its SSH form.
+ * Returns undefined for a url that is neither, such as a local filesystem path, there is no other protocol to retry with.
+ */
+function alternateProtocolUrl(url: string): string | undefined {
+    const scpLike = /^git@([^:]+):(.+)$/.exec(url);
+
+    if (scpLike) {
+        return `https://${scpLike[1]}/${scpLike[2]}`;
+    }
+
+    const sshUri = /^ssh:\/\/git@([^/]+)\/(.+)$/.exec(url);
+
+    if (sshUri) {
+        return `https://${sshUri[1]}/${sshUri[2]}`;
+    }
+
+    const https = /^https:\/\/([^/]+)\/(.+)$/.exec(url);
+
+    if (https) {
+        return `git@${https[1]}:${https[2]}`;
+    }
+
+    return undefined;
+}
+
+/**
+ * Describes the failure of both a url and its other-protocol retry, for a warning that names both attempts.
+ */
+function combineFailureDetail(
+    url: string,
+    detail: string | undefined,
+    retryUrl: string,
+    retryDetail: string | undefined,
+): string {
+    return `${url} failed.${detail ? ` ${detail}` : ""}\n${retryUrl} failed.${retryDetail ? ` ${retryDetail}` : ""}`;
+}
+
+/**
+ * Runs a git subcommand against the clone's own origin, retrying once with the origin's other protocol on failure.
+ * The retry overrides the origin url for that one command only, the clone's own config is left untouched.
+ */
+async function runWithOriginRetry(
+    cwd: string,
+    args: string[],
+): Promise<GitCommandResult> {
+    const result = await runGitAsync(args, cwd);
+
+    if (result.isSuccessful) {
+        return result;
+    }
+
+    const currentUrl = remoteUrl({ cwd: cwd });
+    const retryUrl = currentUrl ? alternateProtocolUrl(currentUrl) : undefined;
+
+    if (!currentUrl || !retryUrl) {
+        return result;
+    }
+
+    const retryResult = await runGitAsync(
+        ["-c", `remote.origin.url=${retryUrl}`, ...args],
+        cwd,
+    );
+
+    if (retryResult.isSuccessful) {
+        return retryResult;
+    }
+
+    return {
+        detail: combineFailureDetail(
+            currentUrl,
+            result.detail,
+            retryUrl,
+            retryResult.detail,
+        ),
+        isSuccessful: false,
+    };
+}
+
+/**
  * Runs a git subcommand through the async, non-blocking `spawn`.
+ * Credential prompts are disabled so a missing credential fails at once instead of hanging a non-interactive sync.
  */
 function runGitAsync(args: string[], cwd?: string): Promise<GitCommandResult> {
     return new Promise((resolvePromise) => {
-        const child = spawn("git", args, { cwd: cwd });
+        const child = spawn("git", args, {
+            cwd: cwd,
+            env: {
+                ...process.env,
+                GIT_SSH_COMMAND: `${process.env.GIT_SSH_COMMAND ?? "ssh"} -o BatchMode=yes`,
+                GIT_TERMINAL_PROMPT: "0",
+            },
+        });
 
         let stderr = "";
 
