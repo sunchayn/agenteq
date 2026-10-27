@@ -9,6 +9,7 @@ const git = {
     checkoutBranch: checkoutBranch,
     checkoutTag: checkoutTag,
     clone: clone,
+    currentCommit: currentCommit,
     currentTag: currentTag,
     defaultBranch: defaultBranch,
     fetchTags: fetchTags,
@@ -62,6 +63,10 @@ interface CheckoutTagOptions {
 }
 
 interface CurrentTagOptions {
+    cwd: string;
+}
+
+interface CurrentCommitOptions {
     cwd: string;
 }
 
@@ -193,6 +198,20 @@ function currentTag(options: CurrentTagOptions): string | undefined {
     const { cwd } = options;
 
     const result = spawnSync("git", ["describe", "--tags", "--exact-match"], {
+        cwd: cwd,
+        encoding: "utf8",
+    });
+
+    return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+/**
+ * Returns HEAD's short commit hash, or undefined when `cwd` isn't a git working tree.
+ */
+function currentCommit(options: CurrentCommitOptions): string | undefined {
+    const { cwd } = options;
+
+    const result = spawnSync("git", ["rev-parse", "--short", "HEAD"], {
         cwd: cwd,
         encoding: "utf8",
     });
