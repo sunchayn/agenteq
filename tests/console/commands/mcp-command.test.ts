@@ -9,8 +9,7 @@ import { createProgram } from "./command-test-helpers.js";
 
 const execFileAsync = promisify(execFile);
 
-const builtCliPath = new URL("../../../dist/cli.js", import.meta.url)
-    .pathname;
+const builtCliPath = new URL("../../../dist/cli.js", import.meta.url).pathname;
 
 let cwd: string;
 let outputFile: string;
@@ -197,17 +196,21 @@ describe("agenteq mcp exec", () => {
 
 describe("agenteq mcp exec, run through the built CLI", () => {
     it("skips a missing --dotenv path and resolves the key from the environment", async () => {
-        const { stdout } = await execFileAsync(process.execPath, [
-            builtCliPath,
-            "mcp",
-            "exec",
-            "--dotenv",
-            join(cwd, "missing.env"),
-            "--",
+        const { stdout } = await execFileAsync(
             process.execPath,
-            "-e",
-            "process.stdout.write(process.env.AGENTEQ_TEST_VAR ?? '')",
-        ], { env: { ...process.env, AGENTEQ_TEST_VAR: "from-process" } });
+            [
+                builtCliPath,
+                "mcp",
+                "exec",
+                "--dotenv",
+                join(cwd, "missing.env"),
+                "--",
+                process.execPath,
+                "-e",
+                "process.stdout.write(process.env.AGENTEQ_TEST_VAR ?? '')",
+            ],
+            { env: { ...process.env, AGENTEQ_TEST_VAR: "from-process" } },
+        );
 
         expect(stdout).toBe("from-process");
     });
