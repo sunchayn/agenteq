@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0](https://github.com/sunchayn/agenteq/compare/v1.5.0...v1.6.0) (2026-10-27)
+
+
+### Added
+
+* **artifacts:** resolve MCP env-file secrets ([#66](https://github.com/sunchayn/agenteq/issues/66)) ([0242fe9](https://github.com/sunchayn/agenteq/commit/0242fe9376026df078a91d0342fcfbac8d13642c))
+* **artifacts:** sync remote skills in Boost projects ([#68](https://github.com/sunchayn/agenteq/issues/68)) ([b42f97d](https://github.com/sunchayn/agenteq/commit/b42f97dd27269b55b243ae87f43b31f9b7f4d021))
+* **cli:** add `status` command ([#70](https://github.com/sunchayn/agenteq/issues/70)) ([e0169d3](https://github.com/sunchayn/agenteq/commit/e0169d3a18ca6a86c3e251fb56154f33aa16ff76))
+
+
+### Fixed
+
+* **artifacts:** collapse blank lines in written guidelines to match Boost ([#67](https://github.com/sunchayn/agenteq/issues/67)) ([aaa472a](https://github.com/sunchayn/agenteq/commit/aaa472a1ee20f0e81965a6ac877ff33f2cabd7be))
+* **artifacts:** mirror root alias references and scope remote skill scans to selection ([#65](https://github.com/sunchayn/agenteq/issues/65)) ([6e40486](https://github.com/sunchayn/agenteq/commit/6e404863028f2a7510c1b0bb9325a27582cc00e6))
+
 ## [1.5.0](https://github.com/sunchayn/agenteq/compare/v1.4.0...v1.5.0) (2026-10-19)
 
 ### Added
