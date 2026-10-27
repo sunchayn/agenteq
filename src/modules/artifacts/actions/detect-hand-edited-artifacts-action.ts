@@ -2,12 +2,13 @@ import { join } from "node:path";
 import filesystem from "@infrastructure/filesystem.js";
 import { hashContent } from "@support/utils/hash-content.js";
 import loadSyncManifestFileAction from "@artifacts/actions/load-sync-manifest-file-action.js";
+import { GUIDELINES_BLOCK_PATTERN } from "@artifacts/services/artifacts-manager/stages/warm-up-boost-project-stage.js";
 import type { RunContext } from "@shared/types/run-context.js";
 
 /**
  * Compares every artifact path recorded in the last sync's manifest against its current content.
  * Returns the paths whose hash no longer matches, meaning they were edited by hand since that sync.
- * A path that no longer exists on disk is not reported, there is nothing left to overwrite there.
+ * Skips a path that no longer exists on disk, or a guideline file still carrying Boost's block.
  */
 export default async function detectHandEditedArtifactsAction(
     options: DetectHandEditedArtifactsOptions,
@@ -22,6 +23,12 @@ export default async function detectHandEditedArtifactsAction(
         const content = await readFileContent(join(context.cwd, relPath));
 
         if (content === undefined) {
+            continue;
+        }
+
+        if (GUIDELINES_BLOCK_PATTERN.test(content)) {
+            // Boost rewrites this block on every install or update,
+            // so a mismatch here is not something a person did by hand.
             continue;
         }
 

@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.6.1](https://github.com/sunchayn/agenteq/compare/v1.6.0...v1.6.1) (2026-10-27)
 
-
 ### Fixed
 
-* **cli:** use non-conflicting option for env file ([#72](https://github.com/sunchayn/agenteq/issues/72)) ([eea9416](https://github.com/sunchayn/agenteq/commit/eea94166ebfa84112d4b9ca116c4890bd61a9ae8))
+- **cli:** use non-conflicting option for env file ([#72](https://github.com/sunchayn/agenteq/issues/72)) ([eea9416](https://github.com/sunchayn/agenteq/commit/eea94166ebfa84112d4b9ca116c4890bd61a9ae8))
 
 ## [1.6.0](https://github.com/sunchayn/agenteq/compare/v1.5.0...v1.6.0) (2026-10-27)
 

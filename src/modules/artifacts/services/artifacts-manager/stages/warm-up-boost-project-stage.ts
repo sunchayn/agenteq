@@ -5,7 +5,11 @@ import type Agent from "@agents/entities/agent.js";
 import resolveBoostAgentsAction from "@agents/actions/resolve-boost-agents-action.js";
 import { SyncPayload } from "@artifacts/data-transfer-objects/sync-payload.js";
 
-const GUIDELINES_BLOCK_PATTERN =
+/**
+ * Matches the block Boost rewrites on every install or update.
+ * Shared with the hand-edit guard, which skips files Boost owns and rewrites anyway.
+ */
+export const GUIDELINES_BLOCK_PATTERN =
     /<laravel-boost-guidelines>(.*?)<\/laravel-boost-guidelines>/s;
 
 /**
