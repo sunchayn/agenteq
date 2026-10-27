@@ -55,6 +55,27 @@ describe("detectHandEditedArtifactsAction", () => {
         ).toEqual(["CLAUDE.md"]);
     });
 
+    it("reports nothing for a guideline file still carrying Boost's block", async () => {
+        await writeFile(
+            join(cwd, "CLAUDE.md"),
+            "<laravel-boost-guidelines>\nold\n</laravel-boost-guidelines>",
+        );
+
+        await saveSyncManifestFileAction({
+            artifactPaths: ["CLAUDE.md"],
+            context: context,
+        });
+
+        await writeFile(
+            join(cwd, "CLAUDE.md"),
+            "<laravel-boost-guidelines>\nnew\n</laravel-boost-guidelines>",
+        );
+
+        expect(
+            await detectHandEditedArtifactsAction({ context: context }),
+        ).toEqual([]);
+    });
+
     it("reports nothing for a file that was deleted since the last sync", async () => {
         await writeFile(join(cwd, "CLAUDE.md"), "hello");
 
