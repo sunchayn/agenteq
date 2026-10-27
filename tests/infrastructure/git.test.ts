@@ -370,11 +370,7 @@ describe("git protocol retry", () => {
 
         const sshWrapper = join(cwd, "fake-ssh.sh");
 
-        await writeFile(
-            sshWrapper,
-            '#!/bin/bash\neval "${@: -1}"\n',
-            "utf8",
-        );
+        await writeFile(sshWrapper, '#!/bin/bash\neval "${@: -1}"\n', "utf8");
 
         spawnSync("chmod", ["+x", sshWrapper]);
 
@@ -386,9 +382,9 @@ describe("git protocol retry", () => {
             const result = await git.pull({ cwd: targetDir });
 
             expect(result.isSuccessful).toBe(true);
-            expect(
-                await readFile(join(targetDir, "retried.md"), "utf8"),
-            ).toBe("it worked");
+            expect(await readFile(join(targetDir, "retried.md"), "utf8")).toBe(
+                "it worked",
+            );
         } finally {
             if (previousSshCommand === undefined) {
                 delete process.env.GIT_SSH_COMMAND;
