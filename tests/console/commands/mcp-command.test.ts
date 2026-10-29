@@ -102,6 +102,37 @@ describe("agenteq mcp exec", () => {
         await expect(readFile(outputFile, "utf8")).resolves.toBe("from-a");
     });
 
+    it("expands a leading ~ in a --dotenv path", async () => {
+        const originalHome = process.env.HOME;
+
+        process.env.HOME = cwd;
+        await writeFile(join(cwd, ".env"), "AGENTEQ_TEST_VAR=from-home\n");
+        process.env.AGENTEQ_TEST_VAR = "${AGENTEQ_TEST_VAR}";
+
+        const program = createProgram(registerMcpCommand);
+
+        try {
+            await program.parseAsync([
+                "node",
+                "agenteq",
+                "mcp",
+                "exec",
+                "--dotenv",
+                "~/.env",
+                "--",
+                ...writeVarScript("AGENTEQ_TEST_VAR"),
+            ]);
+        } finally {
+            if (originalHome === undefined) {
+                delete process.env.HOME;
+            } else {
+                process.env.HOME = originalHome;
+            }
+        }
+
+        await expect(readFile(outputFile, "utf8")).resolves.toBe("from-home");
+    });
+
     it("silently ignores a missing --dotenv path", async () => {
         process.env.AGENTEQ_TEST_VAR = "from-process";
 
