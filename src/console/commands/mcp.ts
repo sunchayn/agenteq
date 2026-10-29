@@ -4,6 +4,7 @@ import filesystem from "@infrastructure/filesystem.js";
 import { CliError } from "@support/errors/cli-error.js";
 import { parseDotenv } from "@support/utils/parse-dotenv.js";
 import { expandEnvPlaceholders } from "@support/utils/expand-env-placeholders.js";
+import { expandPath } from "@support/utils/expand-path.js";
 
 /**
  * Registers `agenteq mcp exec`, the runner a synced MCP entry wraps itself in.
@@ -120,7 +121,7 @@ async function readEnvFiles(paths: string[]): Promise<Record<string, string>> {
     const merged: Record<string, string> = {};
 
     for (const path of paths) {
-        const text = await filesystem.readFile(path);
+        const text = await filesystem.readFile(expandPath(path));
 
         if (!text) {
             continue;
