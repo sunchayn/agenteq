@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.6.4](https://github.com/sunchayn/agenteq/compare/v1.6.3...v1.6.4) (2026-10-27)
 
-
 ### Fixed
 
-* **core:** rewrite the retry url with insteadOf instead ([#81](https://github.com/sunchayn/agenteq/issues/81)) ([ad2e056](https://github.com/sunchayn/agenteq/commit/ad2e056b5c4e9baeab2ea9f96fc196769f7f41ad))
+- **core:** rewrite the retry url with insteadOf instead ([#81](https://github.com/sunchayn/agenteq/issues/81)) ([ad2e056](https://github.com/sunchayn/agenteq/commit/ad2e056b5c4e9baeab2ea9f96fc196769f7f41ad))
 
 ## [1.6.3](https://github.com/sunchayn/agenteq/compare/v1.6.2...v1.6.3) (2026-10-27)
 

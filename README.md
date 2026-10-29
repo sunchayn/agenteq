@@ -338,7 +338,7 @@ If a command fails, the error message starts with a code in parentheses, for exa
 | `E_REMOTE_SOURCE_CHECKOUT_FAILED`    | `remote-source pin` could not check out the resolved tag, see the printed detail for the underlying git error.                                                                                                           |
 | `E_REMOTE_SOURCE_NO_DEFAULT_BRANCH`  | `remote-source unpin` could not determine the remote's default branch from its clone.                                                                                                                                    |
 | `E_MISSING_MCP_EXEC_COMMAND`         | `mcp exec` was run with no command after `--`. Pass the real server command there.                                                                                                                                       |
-| `E_MISSING_MCP_ENV_VAR`              | `mcp exec` could not resolve a `${VAR}` it needed, in neither the process environment nor any `--dotenv`. The message names the var and the files it checked.                                                          |
+| `E_MISSING_MCP_ENV_VAR`              | `mcp exec` could not resolve a `${VAR}` it needed, in neither the process environment nor any `--dotenv`. The message names the var and the files it checked.                                                            |
 
 ### MCP config
 

@@ -130,9 +130,7 @@ describe("agenteq mcp exec", () => {
             }
         }
 
-        await expect(readFile(outputFile, "utf8")).resolves.toBe(
-            "from-home",
-        );
+        await expect(readFile(outputFile, "utf8")).resolves.toBe("from-home");
     });
 
     it("silently ignores a missing --dotenv path", async () => {
