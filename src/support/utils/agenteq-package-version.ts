@@ -1,5 +1,5 @@
 // x-release-please-start-version
-const AGENTEQ_VERSION = "1.6.4";
+const AGENTEQ_VERSION = "1.6.5";
 // x-release-please-end
 
 /**

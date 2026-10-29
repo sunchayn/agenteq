@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.5](https://github.com/sunchayn/agenteq/compare/v1.6.4...v1.6.5) (2026-10-29)
+
+
+### Fixed
+
+* **core:** expand ~ and env vars in mcp exec --dotenv paths ([#84](https://github.com/sunchayn/agenteq/issues/84)) ([72a7dfa](https://github.com/sunchayn/agenteq/commit/72a7dfa04606e7d170fee6a0fc8af2135faf77e4)), closes [#83](https://github.com/sunchayn/agenteq/issues/83)
+
 ## [1.6.4](https://github.com/sunchayn/agenteq/compare/v1.6.3...v1.6.4) (2026-10-27)
 
 ### Fixed
